@@ -1476,4 +1476,27 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
+<!-- Flow Switching JavaScript -->
+<script>
+function switchToPlanFirst() {
+  // Show the plan selection modal for plan-first flow
+  window.location.href = '/?flow=plan-first#planModal';
+}
+
+function switchToWorkspaceFirst() {
+  // Navigate to workspace-first flow
+  const currentDate = document.getElementById('selected-date')?.value || '{{ date }}';
+  window.location.href = `/book?flow=workspace-first&date=${currentDate}`;
+}
+
+// Update existing selectPlan function to preserve flow type
+function selectPlan(planType) {
+  const modal = bootstrap.Modal.getInstance(document.getElementById('planSelectionModal'));
+  if (modal) modal.hide();
+  
+  const currentDate = document.getElementById('selected-date')?.value || '{{ date }}';
+  window.location.href = `/book?plan=${planType}&flow=plan-first&date=${currentDate}`;
+}
+</script>
+
 {% endblock %}
