@@ -1,5 +1,74 @@
 {% extends "base.html" %}
 {% block content %}
+
+{% if pre_selected_plan %}
+<!-- Pre-selected plan flow: Resource selection directly -->
+<div class="row mb-4">
+  <div class="col-12">
+    <div class="alert alert-info">
+      <strong>{{ pre_selected_plan.title() }} booking selected</strong> — Choose your workspace below
+      <a href="/" class="btn btn-sm btn-outline-secondary ms-3">← Change plan</a>
+    </div>
+  </div>
+</div>
+
+<h2>Choose your workspace</h2>
+<p class="text-muted mb-4">
+  {% if pre_selected_plan == 'hour' %}Book specific time slots with flexible scheduling{% endif %}
+  {% if pre_selected_plan == 'day' %}Full day access within business hours{% endif %}
+  {% if pre_selected_plan == 'week' %}7 consecutive days of unlimited access{% endif %}
+  {% if pre_selected_plan == 'month' %}30 consecutive days of unlimited access{% endif %}
+</p>
+
+<!-- Date selection for availability -->
+<form method="get" action="/book" class="row g-3 mb-4">
+  <input type="hidden" name="plan" value="{{ pre_selected_plan }}">
+  <div class="col-auto">
+    <label class="form-label">See availability for:</label>
+    <input type="date" name="date" value="{{ date }}" class="form-control">
+  </div>
+  <div class="col-auto align-self-end">
+    <button class="btn btn-outline-secondary">Show availability</button>
+  </div>
+</form>
+
+<!-- Resource selection for pre-selected plan -->
+<div class="row g-4 mb-4">
+  {% for r in resources %}
+  <div class="col-md-6">
+    <div class="card h-100 resource-card" onclick="selectResourceForPlan({{ r.id }}, '{{ r.name }}', '{{ pre_selected_plan }}')">
+      <div class="card-body">
+        <h5 class="card-title">{{ r.name }}</h5>
+        <p class="text-muted">Capacity: {{ r.capacity }} seats</p>
+        
+        {% set info = capacity_info.get(r.id, {'available': r.capacity, 'total': r.capacity}) %}
+        <span class="badge mb-3 {{ 'bg-success' if info.available > 2 else 'bg-warning' if info.available > 0 else 'bg-danger' }}">
+          {{ info.available }}/{{ info.total }} available
+        </span>
+        
+        <div class="pricing-display">
+          {% if pre_selected_plan == 'hour' %}
+            <h4 class="text-primary">${{ "%.0f"|format(r.hourly_rate_cents/100) }}<small>/hour</small></h4>
+          {% elif pre_selected_plan == 'day' %}
+            <h4 class="text-primary">${{ "%.0f"|format(r.day_rate_cents/100) }}<small>/day</small></h4>
+          {% elif pre_selected_plan == 'week' %}
+            <h4 class="text-primary">${{ "%.0f"|format(r.week_rate_cents/100) }}<small>/week</small></h4>
+          {% elif pre_selected_plan == 'month' %}
+            <h4 class="text-primary">${{ "%.0f"|format(r.month_rate_cents/100) }}<small>/month</small></h4>
+          {% endif %}
+        </div>
+        
+        <button class="btn btn-primary w-100 mt-3">
+          Book {{ r.name }}
+        </button>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% else %}
+<!-- No plan selected: Show original modal flow -->
 <h2>Reserve your workspace</h2>
 
 <!-- Date selection for availability -->
@@ -36,73 +105,45 @@
   </div>
   {% endfor %}
 </div>
+{% endif %}
 
-<!-- Step 1: Resource Selection Modal -->
-<div class="modal fade" id="resourceModal" tabindex="-1">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title">Step 1: Choose your workspace</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-        <div class="row g-3">
-          {% for r in resources %}
-          <div class="col-12">
-            <div class="card resource-option" data-resource-id="{{ r.id }}" onclick="selectResourceStep1({{ r.id }}, '{{ r.name }}')">
-              <div class="card-body">
-                <div class="row align-items-center">
-                  <div class="col-8">
-                    <h6 class="mb-1">{{ r.name }}</h6>
-                    <small class="text-muted">Capacity: {{ r.capacity }}</small>
-                  </div>
-                  <div class="col-4 text-end">
-                    {% set info = capacity_info.get(r.id, {'available': r.capacity, 'total': r.capacity}) %}
-                    <span class="badge {{ 'bg-success' if info.available > 2 else 'bg-warning' if info.available > 0 else 'bg-danger' }}">
-                      {{ info.available }}/{{ info.total }}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
+<!-- Current bookings display -->
+<div class="card">
+  <div class="card-header">Current bookings — {{ date }}</div>
+  <div class="card-body">
+    {% if grouped %}
+      <div class="row">
+        {% for resource_id, bookings in grouped.items() %}
+          {% set resource = resources|selectattr("id", "equalto", resource_id)|first %}
+          <div class="col-md-6 mb-3">
+            <h6>{{ resource.name if resource else 'Resource ' + resource_id|string }}</h6>
+            {% for b in bookings %}
+              <span class="badge text-bg-secondary me-1 mb-1">
+                {{ b.start_dt.strftime("%I:%M %p") }}–{{ b.end_dt.strftime("%I:%M %p") }}
+                {% if b.plan_type != 'hour' %}({{ b.plan_type }} pass){% endif %}
+              </span>
+            {% endfor %}
           </div>
-          {% endfor %}
-        </div>
+        {% endfor %}
       </div>
-    </div>
+    {% else %}
+      <p class="text-success mb-0">All resources are available all day!</p>
+    {% endif %}
   </div>
 </div>
 
-<!-- Step 2: Plan Selection Modal -->
-<div class="modal fade" id="planModal" tabindex="-1">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title">Step 2: How long do you need the space?</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-        <p class="text-muted">Selected: <strong id="selected-resource-name"></strong></p>
-        <div class="row g-3" id="plan-options">
-          <!-- Plan options will be populated by JavaScript -->
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Step 3: Booking Details Modal -->
-<div class="modal fade" id="detailsModal" tabindex="-1">
+<!-- Booking Details Modal for Pre-selected Plan -->
+<div class="modal fade" id="bookingModal" tabindex="-1">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title">Step 3: Booking details</h5>
+        <h5 class="modal-title">Complete your booking</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
         <form id="booking-form" method="post" action="/book">
           <input type="hidden" name="resource_id" id="form-resource-id">
-          <input type="hidden" name="plan_type" id="form-plan-type">
+          <input type="hidden" name="plan_type" id="form-plan-type" value="{{ pre_selected_plan }}">
           <input type="hidden" name="date" value="{{ date }}">
           
           <!-- Personal info -->
@@ -160,37 +201,69 @@
         </form>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" onclick="goToPlanSelection()">← Back</button>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
         <button type="button" class="btn btn-primary" onclick="submitBooking()">Complete Booking</button>
       </div>
     </div>
   </div>
 </div>
 
-<!-- Available time slots display -->
-<div class="card">
-  <div class="card-header">Current bookings — {{ date }}</div>
-  <div class="card-body">
-    {% if grouped %}
-      <div class="row">
-        {% for resource_id, bookings in grouped.items() %}
-          {% set resource = resources|selectattr("id", "equalto", resource_id)|first %}
-          <div class="col-md-6 mb-3">
-            <h6>{{ resource.name if resource else 'Resource ' + resource_id|string }}</h6>
-            {% for b in bookings %}
-              <span class="badge text-bg-secondary me-1 mb-1">
-                {{ b.start_dt.strftime("%I:%M %p") }}–{{ b.end_dt.strftime("%I:%M %p") }}
-                {% if b.plan_type != 'hour' %}({{ b.plan_type }} pass){% endif %}
-              </span>
-            {% endfor %}
-          </div>
-        {% endfor %}
+{% if not pre_selected_plan %}
+<!-- Original Modal Flow (only shown when no plan is pre-selected) -->
+<!-- Step 1: Resource Selection Modal -->
+<div class="modal fade" id="resourceModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Step 1: Choose your workspace</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
-    {% else %}
-      <p class="text-success mb-0">All resources are available all day!</p>
-    {% endif %}
+      <div class="modal-body">
+        <div class="row g-3">
+          {% for r in resources %}
+          <div class="col-12">
+            <div class="card resource-option" data-resource-id="{{ r.id }}" onclick="selectResourceStep1({{ r.id }}, '{{ r.name }}')">
+              <div class="card-body">
+                <div class="row align-items-center">
+                  <div class="col-8">
+                    <h6 class="mb-1">{{ r.name }}</h6>
+                    <small class="text-muted">Capacity: {{ r.capacity }}</small>
+                  </div>
+                  <div class="col-4 text-end">
+                    {% set info = capacity_info.get(r.id, {'available': r.capacity, 'total': r.capacity}) %}
+                    <span class="badge {{ 'bg-success' if info.available > 2 else 'bg-warning' if info.available > 0 else 'bg-danger' }}">
+                      {{ info.available }}/{{ info.total }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
   </div>
 </div>
+
+<!-- Step 2: Plan Selection Modal -->
+<div class="modal fade" id="planModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Step 2: How long do you need the space?</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted">Selected: <strong id="selected-resource-name"></strong></p>
+        <div class="row g-3" id="plan-options">
+          <!-- Plan options will be populated by JavaScript -->
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
 
 <script>
 // Resource data for JavaScript
@@ -213,8 +286,20 @@ resources.forEach(r => {
 });
 
 let selectedResource = null;
-let selectedPlan = null;
+let selectedPlan = '{{ pre_selected_plan }}' || null;
 
+// Function for pre-selected plan flow
+function selectResourceForPlan(resourceId, resourceName, planType) {
+  selectedResource = resourceId;
+  selectedPlan = planType;
+  
+  document.getElementById('form-resource-id').value = resourceId;
+  document.getElementById('form-plan-type').value = planType;
+  
+  showBookingDetails();
+}
+
+// Original modal flow functions
 function selectResource(resourceId, resourceName) {
   selectedResource = resourceId;
   document.getElementById('selected-resource-name').textContent = resourceName;
@@ -225,7 +310,6 @@ function selectResourceStep1(resourceId, resourceName) {
   selectedResource = resourceId;
   document.getElementById('selected-resource-name').textContent = resourceName;
   
-  // Close resource modal and show plan modal
   const resourceModal = bootstrap.Modal.getInstance(document.getElementById('resourceModal'));
   resourceModal.hide();
   
@@ -310,7 +394,6 @@ function showPlanSelection() {
 function selectPlan(planType) {
   selectedPlan = planType;
   
-  // Close plan modal and show details modal
   const planModal = bootstrap.Modal.getInstance(document.getElementById('planModal'));
   planModal.hide();
   
@@ -324,11 +407,9 @@ function showBookingDetails() {
   
   const resource = resourcesData[selectedResource];
   
-  // Set hidden form fields
   document.getElementById('form-resource-id').value = selectedResource;
   document.getElementById('form-plan-type').value = selectedPlan;
   
-  // Generate plan-specific fields
   const fieldsContainer = document.getElementById('plan-specific-fields');
   let fieldsHTML = '';
   
@@ -403,7 +484,7 @@ function showBookingDetails() {
   fieldsContainer.innerHTML = fieldsHTML;
   updateSummary();
   
-  const detailsModal = new bootstrap.Modal(document.getElementById('detailsModal'));
+  const detailsModal = new bootstrap.Modal(document.getElementById('bookingModal'));
   detailsModal.show();
 }
 
@@ -454,15 +535,6 @@ function updateSummary() {
   `;
   
   summaryContainer.innerHTML = summaryHTML;
-}
-
-function goToPlanSelection() {
-  const detailsModal = bootstrap.Modal.getInstance(document.getElementById('detailsModal'));
-  detailsModal.hide();
-  
-  setTimeout(() => {
-    showPlanSelection();
-  }, 300);
 }
 
 function submitBooking() {

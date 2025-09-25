@@ -432,6 +432,7 @@ def index():
 def book_page():
     resources = Resource.query.filter_by(active=True).all()
     date = request.args.get("date") or dt.date.today().isoformat()
+    pre_selected_plan = request.args.get("plan")  # Get pre-selected plan from URL
     grouped = day_bookings(date)
     
     # Calculate capacity for each resource for the selected date
@@ -451,7 +452,8 @@ def book_page():
                          capacity_info=capacity_info,
                          as_money=as_money,
                          use_mercury=USE_MERCURY,
-                         allow_pos=ALLOW_POS_CHECKOUT)
+                         allow_pos=ALLOW_POS_CHECKOUT,
+                         pre_selected_plan=pre_selected_plan)
 
 @app.post("/book")
 def create_booking():

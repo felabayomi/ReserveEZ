@@ -5,35 +5,171 @@
     <h1 class="mb-3">Work. Connect. Discover.</h1>
     <p class="lead">Flexible desks + strong Wi-Fi on the border of Cumberland, MD & Wiley Ford, WV.</p>
     <p class="text-muted">Opening hours: Mon–Fri 9–6, Sat 10–2. Closed Sun.</p>
-    <a class="btn btn-primary btn-lg" href="{{ url_for('book_page') }}">Book a desk</a>
+    <button class="btn btn-primary btn-lg" data-bs-toggle="modal" data-bs-target="#planSelectionModal">Book a desk</button>
   </div>
   <div class="col-lg-5">
     <div class="card">
-      <div class="card-header">Today's rates</div>
-      <ul class="list-group list-group-flush">
-        {% for r in resources %}
-        <li class="list-group-item d-flex justify-content-between align-items-center">
-          <div>
-            <strong>{{ r.name }}</strong>
-            <small class="text-muted d-block">Capacity: {{ r.capacity }} seats</small>
+      <div class="card-header">Workspace options</div>
+      <div class="card-body">
+        <div class="row g-3">
+          {% for r in resources %}
+          <div class="col-6">
+            <div class="text-center">
+              <h6 class="mb-2">{{ r.name }}</h6>
+              <small class="text-muted d-block mb-2">{{ r.capacity }} seats</small>
+              <div class="pricing-grid">
+                <div class="small">
+                  <div><strong>${{ "%.0f"|format(r.hourly_rate_cents/100) }}</strong>/hr</div>
+                  <div><strong>${{ "%.0f"|format(r.day_rate_cents/100) }}</strong>/day</div>
+                  <div><strong>${{ "%.0f"|format(r.week_rate_cents/100) }}</strong>/week</div>
+                  <div><strong>${{ "%.0f"|format(r.month_rate_cents/100) }}</strong>/month</div>
+                </div>
+              </div>
+            </div>
           </div>
-          <span class="badge bg-primary rounded-pill">${{ "%.2f"|format(r.hourly_rate_cents/100) }}/hr</span>
-        </li>
-        {% endfor %}
-      </ul>
+          {% endfor %}
+        </div>
+      </div>
     </div>
     
     <div class="card mt-3">
-      <div class="card-header">Passes available</div>
+      <div class="card-header">How it works</div>
       <div class="card-body">
-        <p class="small text-muted">Passes let you book free during valid dates (subject to capacity).</p>
-        <ul class="list-unstyled">
-          <li><strong>Day Pass:</strong> $10 — unlimited same-day bookings</li>
-          <li><strong>Weekly Pass:</strong> $30 — 7 days from purchase</li>
-          <li><strong>Monthly Pass:</strong> $120 — 30 days from purchase</li>
-        </ul>
+        <div class="row g-3">
+          <div class="col-6">
+            <h6>Hourly</h6>
+            <p class="small text-muted">Book specific time slots</p>
+          </div>
+          <div class="col-6">
+            <h6>Day Pass</h6>
+            <p class="small text-muted">All-day access within business hours</p>
+          </div>
+          <div class="col-6">
+            <h6>Week Pass</h6>
+            <p class="small text-muted">7 consecutive days of access</p>
+          </div>
+          <div class="col-6">
+            <h6>Month Pass</h6>
+            <p class="small text-muted">30 consecutive days of access</p>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 </div>
+
+<!-- Plan Selection Modal -->
+<div class="modal fade" id="planSelectionModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Choose your booking plan</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted mb-4">How long do you need the workspace?</p>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <div class="card plan-card h-100" onclick="selectPlan('hour')">
+              <div class="card-body text-center">
+                <h5 class="card-title">⏰ Hourly</h5>
+                <p class="card-text">Perfect for short meetings or focused work sessions.</p>
+                <div class="pricing-examples">
+                  <small class="text-muted">Starting from</small>
+                  <div><strong>$5/hour</strong></div>
+                </div>
+                <div class="mt-3">
+                  <span class="badge bg-light text-dark">Flexible timing</span>
+                  <span class="badge bg-light text-dark">Pay as you go</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="card plan-card h-100" onclick="selectPlan('day')">
+              <div class="card-body text-center">
+                <h5 class="card-title">📅 Day Pass</h5>
+                <p class="card-text">Full day access within our business hours.</p>
+                <div class="pricing-examples">
+                  <small class="text-muted">Starting from</small>
+                  <div><strong>$15/day</strong></div>
+                </div>
+                <div class="mt-3">
+                  <span class="badge bg-success">Best for full days</span>
+                  <span class="badge bg-light text-dark">9 AM - 6 PM</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="card plan-card h-100" onclick="selectPlan('week')">
+              <div class="card-body text-center">
+                <h5 class="card-title">📊 Week Pass</h5>
+                <p class="card-text">7 consecutive days of unlimited access.</p>
+                <div class="pricing-examples">
+                  <small class="text-muted">Starting from</small>
+                  <div><strong>$60/week</strong></div>
+                </div>
+                <div class="mt-3">
+                  <span class="badge bg-warning text-dark">Great value</span>
+                  <span class="badge bg-light text-dark">7 full days</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="card plan-card h-100" onclick="selectPlan('month')">
+              <div class="card-body text-center">
+                <h5 class="card-title">🏢 Month Pass</h5>
+                <p class="card-text">30 consecutive days of unlimited access.</p>
+                <div class="pricing-examples">
+                  <small class="text-muted">Starting from</small>
+                  <div><strong>$150/month</strong></div>
+                </div>
+                <div class="mt-3">
+                  <span class="badge bg-primary">Best value</span>
+                  <span class="badge bg-light text-dark">30 full days</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function selectPlan(planType) {
+  // Close the modal
+  const modal = bootstrap.Modal.getInstance(document.getElementById('planSelectionModal'));
+  modal.hide();
+  
+  // Redirect to booking page with selected plan
+  window.location.href = `/book?plan=${planType}`;
+}
+
+// Add hover effects for plan cards
+document.addEventListener('DOMContentLoaded', function() {
+  const style = document.createElement('style');
+  style.textContent = `
+    .plan-card {
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border: 2px solid transparent;
+    }
+    .plan-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+      border-color: #0d6efd;
+    }
+    .pricing-grid {
+      font-size: 0.85rem;
+      line-height: 1.4;
+    }
+  `;
+  document.head.appendChild(style);
+});
+</script>
+
 {% endblock %}
