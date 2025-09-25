@@ -9,6 +9,7 @@ The application handles resource management with configurable capacity limits an
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
+Simplified calendar interface: Only today shown in olive green, all other dates normal/white until actually booked.
 
 ## System Architecture
 
