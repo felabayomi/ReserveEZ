@@ -22,11 +22,11 @@
   </div>
   <div class="col-lg-5">
     <div class="logo-container">
-      <iframe 
-        src="https://player.cloudinary.com/embed/?cloud_name=do26xsbby&public_id=Discoverer_Logo_lkxor3&profile=cld-default&autoplay=true&loop=true&muted=true&controls=false&showinfo=false&modestbranding=true&transformation=c_fill,w_500,h_400" 
-        width="100%" 
-        height="400" 
-        style="border: none; background: transparent;"
+      <iframe
+        src="https://player.cloudinary.com/embed/?cloud_name=do26xsbby&public_id=Discoverer_Logo_lkxor3&profile=cld-default&autoplay=true&loop=true&muted=true&controls=false"
+        width="640"
+        height="360" 
+        style="height: auto; width: 100%; aspect-ratio: 640 / 360; border: none; background: transparent;"
         allow="autoplay; encrypted-media"
         frameborder="0">
       </iframe>
@@ -255,7 +255,6 @@ document.addEventListener('DOMContentLoaded', function() {
     .logo-container {
       position: relative;
       width: 100%;
-      height: 400px;
       overflow: hidden;
       background: transparent;
       margin: 0;
@@ -263,18 +262,13 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     .logo-container iframe {
-      width: 120%;
-      height: 120%;
-      position: absolute;
-      top: -10%;
-      left: -10%;
       border: none;
       background: transparent;
-      transform: scale(1.1);
+      display: block;
     }
     
     @media (max-width: 768px) {
-      .logo-container {
+      .logo-container iframe {
         height: 250px;
       }
     }
