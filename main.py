@@ -2692,6 +2692,257 @@ def manual_send_daily_summary(date=None):
         <p><a href="/">← Back to EasyDesk</a></p>
         """, 500
 
+@app.get("/run-all-email-checks")
+def run_all_automatic_email_checks():
+    """Run all automatic email checks - ideal for cron job/scheduler"""
+    try:
+        # Check and send booking reminders
+        reminder_result = check_and_send_reminders()
+        
+        # Check and send pass notifications  
+        pass_result = check_and_send_pass_notifications()
+        
+        # Calculate totals
+        total_emails_sent = 0
+        if "sent_24h" in reminder_result and "sent_2h" in reminder_result:
+            total_emails_sent += int(reminder_result["sent_24h"]) + int(reminder_result["sent_2h"])
+        
+        if "sent_confirmations" in pass_result and "sent_warnings" in pass_result:
+            total_emails_sent += int(pass_result["sent_confirmations"]) + int(pass_result["sent_warnings"])
+        
+        # Check for errors
+        errors = []
+        if "error" in reminder_result:
+            errors.append(f"Reminders: {reminder_result['error']}")
+        if "error" in pass_result:
+            errors.append(f"Passes: {pass_result['error']}")
+        
+        if errors:
+            return f"""
+            <h2>⚠️ Email Check Completed with Errors</h2>
+            <p><strong>Total emails sent:</strong> {total_emails_sent}</p>
+            <div class="alert alert-warning">
+                <strong>Errors encountered:</strong><br>
+                {'<br>'.join(errors)}
+            </div>
+            <hr>
+            <p><strong>Reminder Results:</strong> {reminder_result}</p>
+            <p><strong>Pass Results:</strong> {pass_result}</p>
+            <hr>
+            <p><a href="/admin/email-management">← Back to Email Management</a></p>
+            <p><a href="/">← Back to EasyDesk</a></p>
+            """, 500
+        else:
+            return f"""
+            <h2>✅ All Email Checks Complete</h2>
+            <p><strong>Total emails sent:</strong> {total_emails_sent}</p>
+            
+            <div class="row mt-3">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header bg-primary text-white">📅 Booking Reminders</div>
+                        <div class="card-body">
+                            <p><strong>24-hour reminders:</strong> {reminder_result.get('sent_24h', 0)}</p>
+                            <p><strong>2-hour reminders:</strong> {reminder_result.get('sent_2h', 0)}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header bg-info text-white">🎫 Pass Notifications</div>
+                        <div class="card-body">
+                            <p><strong>Purchase confirmations:</strong> {pass_result.get('sent_confirmations', 0)}</p>
+                            <p><strong>Expiration warnings:</strong> {pass_result.get('sent_warnings', 0)}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="alert alert-info mt-3">
+                <h5>🤖 Automation Setup</h5>
+                <p><strong>For Production:</strong> Schedule this endpoint to run every hour with a cron job or monitoring service:</p>
+                <code>curl -X GET https://your-domain.com/run-all-email-checks</code>
+                
+                <p class="mt-2"><strong>Example Cron Job (every hour):</strong></p>
+                <code>0 * * * * curl -s https://your-domain.com/run-all-email-checks > /dev/null</code>
+            </div>
+            
+            <hr>
+            <p>Last run: {dt.datetime.utcnow().strftime('%B %d, %Y at %I:%M:%S %p')} UTC</p>
+            <p><a href="/admin/email-management">← Back to Email Management</a></p>
+            <p><a href="/">← Back to EasyDesk</a></p>
+            """
+            
+    except Exception as e:
+        return f"""
+        <h2>❌ Email Check System Failed</h2>
+        <p>Critical error in email check system: {str(e)}</p>
+        <hr>
+        <p><a href="/admin/email-management">← Back to Email Management</a></p>
+        <p><a href="/">← Back to EasyDesk</a></p>
+        """, 500
+
+@app.get("/email-system-status")
+def email_system_status():
+    """Get comprehensive email system status and statistics"""
+    try:
+        # Get recent bookings that should have confirmations
+        recent_bookings = Booking.query.filter(
+            Booking.created_at >= dt.datetime.utcnow() - dt.timedelta(days=7)
+        ).count()
+        
+        # Get recent passes
+        recent_passes = Pass.query.filter(
+            Pass.purchase_dt >= dt.datetime.utcnow() - dt.timedelta(days=7)  
+        ).count()
+        
+        # Get upcoming bookings for reminders
+        tomorrow = dt.datetime.utcnow() + dt.timedelta(hours=24)
+        upcoming_bookings_24h = Booking.query.filter(
+            Booking.start_dt.between(
+                dt.datetime.utcnow() + dt.timedelta(hours=23),
+                dt.datetime.utcnow() + dt.timedelta(hours=25)
+            ),
+            Booking.reminder_24h_sent == False
+        ).count()
+        
+        upcoming_bookings_2h = Booking.query.filter(
+            Booking.start_dt.between(
+                dt.datetime.utcnow() + dt.timedelta(hours=1, minutes=30),
+                dt.datetime.utcnow() + dt.timedelta(hours=2, minutes=30)
+            ),
+            Booking.reminder_2h_sent == False
+        ).count()
+        
+        # Get expiring passes (next 2 days)
+        two_days_from_now = dt.datetime.utcnow() + dt.timedelta(days=2)
+        one_day_from_now = dt.datetime.utcnow() + dt.timedelta(days=1)
+        expiring_passes = Pass.query.filter(
+            Pass.status == "active",
+            Pass.valid_to.between(one_day_from_now, two_days_from_now),
+            Pass.expiration_warning_sent == False
+        ).count()
+        
+        # Get unconfirmed pass purchases
+        unconfirmed_passes = Pass.query.filter(
+            Pass.purchase_email_sent == False,
+            Pass.status == "active"
+        ).count()
+        
+        return f"""
+        <html>
+        <head>
+            <title>Email System Status - EasyDesk</title>
+            <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+        </head>
+        <body>
+            <div class="container mt-4">
+                <h2>📊 Email System Status</h2>
+                <p class="text-muted">Current status of automatic email triggers</p>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card border-primary">
+                            <div class="card-header bg-primary text-white">
+                                <h5>📅 Pending Booking Reminders</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row text-center">
+                                    <div class="col-6">
+                                        <h3 class="text-primary">{upcoming_bookings_24h}</h3>
+                                        <small>24-hour reminders due</small>
+                                    </div>
+                                    <div class="col-6">
+                                        <h3 class="text-warning">{upcoming_bookings_2h}</h3>
+                                        <small>2-hour reminders due</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="card border-info">
+                            <div class="card-header bg-info text-white">
+                                <h5>🎫 Pending Pass Notifications</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row text-center">
+                                    <div class="col-6">
+                                        <h3 class="text-success">{unconfirmed_passes}</h3>
+                                        <small>Purchase confirmations due</small>
+                                    </div>
+                                    <div class="col-6">
+                                        <h3 class="text-warning">{expiring_passes}</h3>
+                                        <small>Expiration warnings due</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <div class="card border-secondary">
+                            <div class="card-header bg-secondary text-white">
+                                <h5>📈 Recent Activity (Last 7 Days)</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row text-center">
+                                    <div class="col-md-3">
+                                        <h4 class="text-primary">{recent_bookings}</h4>
+                                        <small>New Bookings</small>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <h4 class="text-info">{recent_passes}</h4>
+                                        <small>Passes Sold</small>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <h4 class="text-success">{'✅' if SENDGRID_API_KEY else '❌'}</h4>
+                                        <small>SendGrid Status</small>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <h4 class="text-warning">{upcoming_bookings_24h + upcoming_bookings_2h + expiring_passes + unconfirmed_passes}</h4>
+                                        <small>Total Pending Emails</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5>🔧 Actions</h5>
+                            </div>
+                            <div class="card-body">
+                                <a href="/run-all-email-checks" class="btn btn-success me-2">🚀 Run All Email Checks Now</a>
+                                <a href="/admin/email-management" class="btn btn-primary me-2">📧 Email Management</a>
+                                <a href="/" class="btn btn-outline-secondary">← Back to EasyDesk</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="alert alert-info mt-4">
+                    <h6>🤖 Automation Recommendations:</h6>
+                    <ul>
+                        <li><strong>High Priority:</strong> Run <code>/run-all-email-checks</code> every hour for timely notifications</li>
+                        <li><strong>Daily Reports:</strong> Schedule <code>/send-daily-summary</code> at end of business day</li>
+                        <li><strong>Monitoring:</strong> Check <code>/email-system-status</code> for pending notifications</li>
+                    </ul>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+    except Exception as e:
+        return f"<h2>❌ Status Check Failed</h2><p>Error: {str(e)}</p>", 500
+
 @app.get("/api/availability/<date>")
 def api_availability(date):
     """API endpoint to get comprehensive availability data for the calendar"""
