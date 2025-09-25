@@ -28,7 +28,7 @@
           <small class="text-muted d-block">Starting at</small>
           <strong>${{ "%.0f"|format(r.hourly_rate_cents/100) }}/hour</strong>
         </div>
-        <button class="btn btn-primary btn-sm mt-2" onclick="startBookingFlow()">
+        <button class="btn btn-primary btn-sm mt-2">
           Book {{ r.name }}
         </button>
       </div>
@@ -37,88 +37,12 @@
   {% endfor %}
 </div>
 
-<!-- Step 1: Plan Selection Modal -->
-<div class="modal fade" id="planModal" tabindex="-1">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title">Step 1: How long do you need the space?</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-        <div class="row g-3">
-          <div class="col-12">
-            <div class="card plan-option" onclick="selectPlanFirst('hour')">
-              <div class="card-body">
-                <div class="row align-items-center">
-                  <div class="col-8">
-                    <h6 class="mb-1">Hourly</h6>
-                    <small class="text-muted">Pay for specific time slots</small>
-                  </div>
-                  <div class="col-4 text-end">
-                    <strong>Starting at $5/hr</strong>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="col-12">
-            <div class="card plan-option" onclick="selectPlanFirst('day')">
-              <div class="card-body">
-                <div class="row align-items-center">
-                  <div class="col-8">
-                    <h6 class="mb-1">Day Pass</h6>
-                    <small class="text-muted">Full day access within business hours</small>
-                  </div>
-                  <div class="col-4 text-end">
-                    <strong>Starting at $15</strong>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="col-12">
-            <div class="card plan-option" onclick="selectPlanFirst('week')">
-              <div class="card-body">
-                <div class="row align-items-center">
-                  <div class="col-8">
-                    <h6 class="mb-1">Week Pass</h6>
-                    <small class="text-muted">7 consecutive days of access</small>
-                  </div>
-                  <div class="col-4 text-end">
-                    <strong>Starting at $60</strong>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="col-12">
-            <div class="card plan-option" onclick="selectPlanFirst('month')">
-              <div class="card-body">
-                <div class="row align-items-center">
-                  <div class="col-8">
-                    <h6 class="mb-1">Month Pass</h6>
-                    <small class="text-muted">30 consecutive days of access</small>
-                  </div>
-                  <div class="col-4 text-end">
-                    <strong>Starting at $150</strong>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Step 2: Resource Selection Modal -->
+<!-- Step 1: Resource Selection Modal -->
 <div class="modal fade" id="resourceModal" tabindex="-1">
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title">Step 2: Choose your workspace</h5>
+        <h5 class="modal-title">Step 1: Choose your workspace</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
@@ -149,6 +73,23 @@
   </div>
 </div>
 
+<!-- Step 2: Plan Selection Modal -->
+<div class="modal fade" id="planModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Step 2: How long do you need the space?</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted">Selected: <strong id="selected-resource-name"></strong></p>
+        <div class="row g-3" id="plan-options">
+          <!-- Plan options will be populated by JavaScript -->
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- Step 3: Booking Details Modal -->
 <div class="modal fade" id="detailsModal" tabindex="-1">
@@ -219,7 +160,7 @@
         </form>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" onclick="goBackToResources()">← Back</button>
+        <button type="button" class="btn btn-secondary" onclick="goToPlanSelection()">← Back</button>
         <button type="button" class="btn btn-primary" onclick="submitBooking()">Complete Booking</button>
       </div>
     </div>
@@ -274,83 +215,109 @@ resources.forEach(r => {
 let selectedResource = null;
 let selectedPlan = null;
 
-// Start booking with plan selection first
-function startBookingFlow() {
-  const planModal = new bootstrap.Modal(document.getElementById('planModal'));
-  planModal.show();
+function selectResource(resourceId, resourceName) {
+  selectedResource = resourceId;
+  document.getElementById('selected-resource-name').textContent = resourceName;
+  showPlanSelection();
 }
 
-// Step 1: Select plan type first
-function selectPlanFirst(planType) {
-  selectedPlan = planType;
+function selectResourceStep1(resourceId, resourceName) {
+  selectedResource = resourceId;
+  document.getElementById('selected-resource-name').textContent = resourceName;
   
-  // Close plan modal and show resource modal
-  const planModal = bootstrap.Modal.getInstance(document.getElementById('planModal'));
-  planModal.hide();
+  // Close resource modal and show plan modal
+  const resourceModal = bootstrap.Modal.getInstance(document.getElementById('resourceModal'));
+  resourceModal.hide();
   
   setTimeout(() => {
-    showResourceSelection();
+    showPlanSelection();
   }, 300);
 }
 
-// Step 2: Show resource selection with pricing for selected plan
-function showResourceSelection() {
-  if (!selectedPlan) return;
+function showPlanSelection() {
+  if (!selectedResource) return;
   
-  // Update resource cards to show pricing for selected plan
-  const resourceOptions = document.querySelector('#resourceModal .modal-body .row');
-  let resourceHTML = '';
+  const resource = resourcesData[selectedResource];
+  const planOptions = document.getElementById('plan-options');
   
-  resources.forEach(r => {
-    let price = 0;
-    if (selectedPlan === 'hour') price = r.hourly_rate_cents;
-    else if (selectedPlan === 'day') price = r.day_rate_cents;
-    else if (selectedPlan === 'week') price = r.week_rate_cents;
-    else if (selectedPlan === 'month') price = r.month_rate_cents;
-    
-    resourceHTML += `
-      <div class="col-12">
-        <div class="card resource-option" onclick="selectResource(${r.id}, '${r.name}')">
-          <div class="card-body">
-            <div class="row align-items-center">
-              <div class="col-8">
-                <h6 class="mb-1">${r.name}</h6>
-                <small class="text-muted">Capacity: ${r.capacity} seats</small>
-              </div>
-              <div class="col-4 text-end">
-                <strong>$${(price/100).toFixed(0)}</strong>
-                <br><small class="text-muted">${selectedPlan === 'hour' ? '/hr' : '/' + selectedPlan}</small>
-              </div>
+  planOptions.innerHTML = `
+    <div class="col-12">
+      <div class="card plan-option" onclick="selectPlan('hour')">
+        <div class="card-body">
+          <div class="row align-items-center">
+            <div class="col-8">
+              <h6 class="mb-1">Hourly</h6>
+              <small class="text-muted">Pay for specific time slots</small>
+            </div>
+            <div class="col-4 text-end">
+              <strong>$${(resource.hourly_rate_cents/100).toFixed(0)}/hr</strong>
             </div>
           </div>
         </div>
       </div>
-    `;
-  });
+    </div>
+    <div class="col-12">
+      <div class="card plan-option" onclick="selectPlan('day')">
+        <div class="card-body">
+          <div class="row align-items-center">
+            <div class="col-8">
+              <h6 class="mb-1">Day Pass</h6>
+              <small class="text-muted">Full day access within business hours</small>
+            </div>
+            <div class="col-4 text-end">
+              <strong>$${(resource.day_rate_cents/100).toFixed(0)}</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-12">
+      <div class="card plan-option" onclick="selectPlan('week')">
+        <div class="card-body">
+          <div class="row align-items-center">
+            <div class="col-8">
+              <h6 class="mb-1">Week Pass</h6>
+              <small class="text-muted">7 consecutive days of access</small>
+            </div>
+            <div class="col-4 text-end">
+              <strong>$${(resource.week_rate_cents/100).toFixed(0)}</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-12">
+      <div class="card plan-option" onclick="selectPlan('month')">
+        <div class="card-body">
+          <div class="row align-items-center">
+            <div class="col-8">
+              <h6 class="mb-1">Month Pass</h6>
+              <small class="text-muted">30 consecutive days of access</small>
+            </div>
+            <div class="col-4 text-end">
+              <strong>$${(resource.month_rate_cents/100).toFixed(0)}</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
   
-  resourceOptions.innerHTML = resourceHTML;
-  
-  // Update modal title to show selected plan
-  document.querySelector('#resourceModal .modal-title').textContent = 
-    `Step 2: Choose workspace (${selectedPlan === 'hour' ? 'Hourly' : selectedPlan.charAt(0).toUpperCase() + selectedPlan.slice(1) + ' Pass'})`;
-  
-  const resourceModal = new bootstrap.Modal(document.getElementById('resourceModal'));
-  resourceModal.show();
+  const planModal = new bootstrap.Modal(document.getElementById('planModal'));
+  planModal.show();
 }
 
-// Step 3: Select resource and go to details
-function selectResource(resourceId, resourceName) {
-  selectedResource = resourceId;
+function selectPlan(planType) {
+  selectedPlan = planType;
   
-  // Close resource modal and show details modal
-  const resourceModal = bootstrap.Modal.getInstance(document.getElementById('resourceModal'));
-  resourceModal.hide();
+  // Close plan modal and show details modal
+  const planModal = bootstrap.Modal.getInstance(document.getElementById('planModal'));
+  planModal.hide();
   
   setTimeout(() => {
     showBookingDetails();
   }, 300);
 }
-
 
 function showBookingDetails() {
   if (!selectedResource || !selectedPlan) return;
@@ -489,12 +456,12 @@ function updateSummary() {
   summaryContainer.innerHTML = summaryHTML;
 }
 
-function goBackToResources() {
+function goToPlanSelection() {
   const detailsModal = bootstrap.Modal.getInstance(document.getElementById('detailsModal'));
   detailsModal.hide();
   
   setTimeout(() => {
-    showResourceSelection();
+    showPlanSelection();
   }, 300);
 }
 
