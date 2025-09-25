@@ -339,6 +339,10 @@
                     <span class="legend-color" style="background: #6b8e23; border: 2px solid #556b2f;"></span>
                     <span>Today</span>
                   </div>
+                  <div class="legend-item">
+                    <span class="legend-color" style="background: #fff3cd; border: 2px solid #ffc107; display: flex; align-items: center; justify-content: center;">📋</span>
+                    <span>Meeting Lounge overflow ($3/hr)</span>
+                  </div>
                 </div>
                 
                 <hr>
@@ -527,8 +531,27 @@ function isDateSelected(date) {
 }
 
 async function fetchAvailabilityData(year, month) {
-  // No mock data - all dates are available until there are actual bookings
-  // Calendar will stay clean and white unless there are real booking constraints
+  // Fetch real availability data from API
+  try {
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dateString = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      
+      try {
+        const response = await fetch(`/api/availability/${dateString}`);
+        if (response.ok) {
+          const availabilityData = await response.json();
+          applyAvailabilityToCalendar(day, availabilityData);
+        }
+      } catch (error) {
+        console.log(`Could not fetch availability for ${dateString}`);
+        // Silently continue - calendar will show as available
+      }
+    }
+  } catch (error) {
+    console.log('Error fetching availability data:', error);
+  }
 }
 
 function applyAvailabilityToCalendar(day, availability) {
@@ -537,21 +560,56 @@ function applyAvailabilityToCalendar(day, availability) {
     // Remove any existing availability classes
     dayCell.classList.remove('availability-available', 'availability-limited', 'availability-booked');
     
-    // Add appropriate availability class
-    dayCell.classList.add(`availability-${availability.status}`);
+    // Determine overall availability status for the day
+    let overallStatus = 'available';
+    let hasOverflow = false;
     
-    // Store availability details for when user clicks
-    dayCell.setAttribute('data-availability', JSON.stringify(availability.details));
+    // Check each resource's status
+    for (const [resourceId, resourceData] of Object.entries(availability)) {
+      if (resourceData.status === 'booked') {
+        if (overallStatus !== 'booked') overallStatus = 'limited';
+      } else if (resourceData.status === 'limited') {
+        overallStatus = 'limited';
+      }
+      
+      // Check for overflow eligibility
+      if (resourceData.overflow_eligible) {
+        hasOverflow = true;
+      }
+    }
     
-    // Add a small indicator for limited availability
-    if (availability.status === 'limited') {
-      const bookingsContainer = dayCell.querySelector('.day-bookings');
-      if (bookingsContainer) {
+    // If all primary resources are booked but overflow is available, mark as limited
+    const hotDeskBooked = Object.values(availability).find(r => r.name === 'Hot Desk')?.status === 'booked';
+    const quietDeskBooked = Object.values(availability).find(r => r.name === 'Quiet Desk')?.status === 'booked';
+    if (hotDeskBooked && quietDeskBooked && hasOverflow) {
+      overallStatus = 'limited';
+    }
+    
+    // Apply the status
+    dayCell.classList.add(`availability-${overallStatus}`);
+    
+    // Store detailed availability data for when user clicks
+    dayCell.setAttribute('data-availability', JSON.stringify(availability));
+    
+    // Add indicators
+    const bookingsContainer = dayCell.querySelector('.day-bookings');
+    if (bookingsContainer) {
+      bookingsContainer.innerHTML = ''; // Clear existing indicators
+      
+      if (overallStatus === 'limited') {
         const indicator = document.createElement('div');
         indicator.className = 'availability-indicator limited';
         indicator.innerHTML = '⚡';
         indicator.title = 'Limited availability';
         bookingsContainer.appendChild(indicator);
+      }
+      
+      if (hasOverflow) {
+        const overflowIndicator = document.createElement('div');
+        overflowIndicator.className = 'availability-indicator overflow';
+        overflowIndicator.innerHTML = '📋';
+        overflowIndicator.title = 'Meeting Lounge available as overflow at $3/hr';
+        bookingsContainer.appendChild(overflowIndicator);
       }
     }
   }
@@ -588,36 +646,81 @@ function updateSelectedDateInfo(dateString) {
   info.querySelector('h6').textContent = 'Selected Date';
   info.querySelector('p').innerHTML = `<strong>${formattedDate}</strong>`;
   
-  // Show seat availability for each resource and booking type
+  // Get availability data from the clicked date
+  const clickedDay = document.querySelector(`[data-date="${dateString}"]`);
+  const availabilityData = clickedDay ? JSON.parse(clickedDay.getAttribute('data-availability') || '{}') : {};
+  
   let detailsHTML = '<div class="availability-breakdown mt-3">';
   
-  // Show availability for each resource using the actual resource data
-  Object.values(resourcesData).forEach(resource => {
-    const availableSeats = resource.capacity; // In real app, this would check actual bookings
+  if (Object.keys(availabilityData).length > 0) {
+    // Show real availability data
+    let hasOverflow = false;
     
+    Object.entries(availabilityData).forEach(([resourceId, resourceData]) => {
+      const totalHours = Object.keys(resourceData.hourly_availability).length;
+      const availableHours = Object.values(resourceData.hourly_availability).filter(seats => seats > 0).length;
+      
+      // Determine what booking types are available
+      const hourlyAvailable = availableHours > 0;
+      const passAvailable = !resourceData.has_pass_booking && resourceData.capacity > 0;
+      
+      detailsHTML += `
+        <div class="resource-availability mb-3">
+          <h6 class="small mb-2"><strong>${resourceData.name}</strong></h6>
+          <div class="seats-info mb-2">
+            <small class="text-muted">${resourceData.capacity} total seats</small>
+            ${resourceData.has_pass_booking ? '<br><small class="text-warning">⚠️ Day/Week/Month pass active</small>' : ''}
+          </div>
+          <div class="plan-availability">
+            <span class="plan-status ${hourlyAvailable ? 'available' : 'unavailable'}">
+              Hourly ${hourlyAvailable ? '✅' : '❌'} $${(resourceData.rates.hourly/100).toFixed(0)}/hr
+            </span>
+            <span class="plan-status ${passAvailable ? 'available' : 'unavailable'}">
+              Day ${passAvailable ? '✅' : '❌'} $${(resourceData.rates.day/100).toFixed(0)}
+            </span>
+            <span class="plan-status ${passAvailable ? 'available' : 'unavailable'}">
+              Week ${passAvailable ? '✅' : '❌'} $${(resourceData.rates.week/100).toFixed(0)}
+            </span>
+            <span class="plan-status ${passAvailable ? 'available' : 'unavailable'}">
+              Month ${passAvailable ? '✅' : '❌'} $${(resourceData.rates.month/100).toFixed(0)}
+            </span>
+          </div>
+        </div>
+      `;
+      
+      // Check for overflow eligibility
+      if (resourceData.overflow_eligible) {
+        hasOverflow = true;
+      }
+    });
+    
+    // Show overflow notice if applicable
+    if (hasOverflow) {
+      detailsHTML += `
+        <div class="overflow-notice mt-3 p-3" style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px;">
+          <h6 class="small mb-2"><strong>📋 Overflow Available</strong></h6>
+          <p class="small mb-1">Hot Desk and Quiet Desk are fully booked, but Meeting Lounge is available as overflow:</p>
+          <div class="plan-availability">
+            <span class="plan-status available">
+              Hourly ✅ $3/hr per seat
+            </span>
+          </div>
+          <small class="text-muted mt-1 d-block"><em>Note: Meeting Lounge bookings are conditional. If the Lounge is booked for Day/Week/Month passes, you may be reassigned.</em></small>
+        </div>
+      `;
+    }
+    
+  } else {
+    // No availability data yet - show as all available
     detailsHTML += `
-      <div class="resource-availability mb-3">
-        <h6 class="small mb-2"><strong>${resource.name}</strong></h6>
-        <div class="seats-info mb-2">
-          <small class="text-muted">${availableSeats} seats available</small>
-        </div>
-        <div class="plan-availability">
-          <span class="plan-status available">
-            Hourly ✅ $${(resource.hourly_rate_cents/100).toFixed(0)}/hr
-          </span>
-          <span class="plan-status available">
-            Day ✅ $${(resource.day_rate_cents/100).toFixed(0)}
-          </span>
-          <span class="plan-status available">
-            Week ✅ $${(resource.week_rate_cents/100).toFixed(0)}
-          </span>
-          <span class="plan-status available">
-            Month ✅ $${(resource.month_rate_cents/100).toFixed(0)}
-          </span>
-        </div>
+      <div class="text-success">
+        <small>✅ All booking types available</small>
+      </div>
+      <div class="mt-2">
+        <small class="text-muted">Hourly, Day, Week, and Month bookings are available for this date.</small>
       </div>
     `;
-  });
+  }
   
   detailsHTML += '</div>';
   detailsDiv.innerHTML = detailsHTML;
@@ -1104,6 +1207,18 @@ document.addEventListener('DOMContentLoaded', function() {
     .plan-status.unavailable {
       background: #f8d7da;
       color: #721c24;
+    }
+    
+    /* Overflow indicator styling */
+    .availability-indicator.overflow {
+      background: #fff3cd;
+      border-radius: 3px;
+      padding: 1px 3px;
+      font-size: 10px;
+    }
+    
+    .overflow-notice {
+      border-left: 4px solid #ffc107 !important;
     }
     
     /* Legend Styles */
