@@ -269,6 +269,109 @@ def send_booking_confirmation_email(booking):
         print(f"Failed to send booking confirmation email: {str(e)}")
         return False
 
+def send_test_emails(test_emails):
+    """Send test emails with sample booking data"""
+    if not SENDGRID_API_KEY:
+        return {"error": "SendGrid API key not configured"}
+    
+    try:
+        sg = SendGridAPIClient(SENDGRID_API_KEY)
+        
+        # Create mock booking data for the test
+        class MockResource:
+            name = "Hot Desk #5"
+        
+        class MockBooking:
+            resource = MockResource()
+            customer_email = test_emails[0]  # Use first test email as customer
+            start_dt = dt.datetime(2025, 9, 26, 9, 0)  # Tomorrow at 9 AM
+            end_dt = dt.datetime(2025, 9, 26, 12, 0)   # Until 12 PM
+            num_seats = 2
+            total_cost_cents = 1500  # $15.00
+        
+        mock_booking = MockBooking()
+        
+        # Prepare email content
+        subject = f"[TEST] Booking Confirmation - {mock_booking.resource.name}"
+        
+        # Create HTML content with mock booking details
+        html_content = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="background-color: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <h4 style="color: #856404; margin: 0;">⚡ TEST EMAIL</h4>
+                <p style="margin: 5px 0 0 0; color: #856404;">This is a test of your booking confirmation email template.</p>
+            </div>
+            
+            <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                <h2 style="color: #28a745; margin: 0;">Booking Confirmed!</h2>
+                <p style="margin: 10px 0 0 0;">Thank you for choosing EasyDesk at City Discoverer</p>
+            </div>
+            
+            <div style="background-color: #ffffff; border: 1px solid #dee2e6; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+                <h3 style="color: #495057; margin-top: 0;">Booking Details</h3>
+                <table style="width: 100%; border-collapse: collapse;">
+                    <tr style="border-bottom: 1px solid #dee2e6;">
+                        <td style="padding: 8px 0; font-weight: bold; color: #6c757d;">Workspace:</td>
+                        <td style="padding: 8px 0;">{mock_booking.resource.name}</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid #dee2e6;">
+                        <td style="padding: 8px 0; font-weight: bold; color: #6c757d;">Customer:</td>
+                        <td style="padding: 8px 0;">{mock_booking.customer_email}</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid #dee2e6;">
+                        <td style="padding: 8px 0; font-weight: bold; color: #6c757d;">Date & Time:</td>
+                        <td style="padding: 8px 0;">{mock_booking.start_dt.strftime('%B %d, %Y at %I:%M %p')} - {mock_booking.end_dt.strftime('%I:%M %p')}</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid #dee2e6;">
+                        <td style="padding: 8px 0; font-weight: bold; color: #6c757d;">Duration:</td>
+                        <td style="padding: 8px 0;">{int((mock_booking.end_dt - mock_booking.start_dt).total_seconds() / 3600)} hours</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid #dee2e6;">
+                        <td style="padding: 8px 0; font-weight: bold; color: #6c757d;">Seats:</td>
+                        <td style="padding: 8px 0;">{mock_booking.num_seats}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 0; font-weight: bold; color: #6c757d;">Total:</td>
+                        <td style="padding: 8px 0; font-weight: bold; color: #28a745;">{as_money(mock_booking.total_cost_cents)}</td>
+                    </tr>
+                </table>
+            </div>
+            
+            <div style="background-color: #e9ecef; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <p style="margin: 0; font-size: 14px; color: #6c757d;">
+                    <strong>Location:</strong> City Discoverer<br>
+                    50 Stately St, Suite 2, Wiley Ford WV 26767
+                </p>
+            </div>
+            
+            <div style="text-align: center; color: #6c757d; font-size: 12px; margin-top: 30px;">
+                <p>Questions? Reply to this email or contact us at hello@citydiscoverer.ai</p>
+            </div>
+        </body>
+        </html>
+        """
+        
+        # Create the email message
+        message = Mail(
+            from_email=Email("billing@citydiscoverer.ai", "EasyDesk Booking System"),
+            to_emails=[To(email) for email in test_emails],
+            subject=subject,
+            html_content=Content("text/html", html_content)
+        )
+        
+        # Set reply-to address
+        message.reply_to = Email("hello@citydiscoverer.ai")
+        
+        # Send the email
+        response = sg.send(message)
+        print(f"Test emails sent successfully! Status code: {response.status_code}")
+        return {"success": True, "status_code": response.status_code, "recipients": test_emails}
+        
+    except Exception as e:
+        print(f"Failed to send test emails: {str(e)}")
+        return {"error": str(e)}
+
 def user_has_used_promo(email: str, code: str) -> bool:
     return Booking.query.filter(
         Booking.email == email,
@@ -1133,6 +1236,35 @@ def success_stripe():
 def cancel():
     bid = request.args.get("bid")
     return render_template("cancel.html", bid=bid)
+
+@app.get("/test-emails")
+def test_emails():
+    """Send test emails to verify email templates"""
+    test_recipients = ["felixabayomi@icloud.com", "felabayomi@gmail.com"]
+    
+    result = send_test_emails(test_recipients)
+    
+    if "error" in result:
+        return f"<h2>❌ Test Email Failed</h2><p>Error: {result['error']}</p>", 500
+    else:
+        return f"""
+        <h2>✅ Test Emails Sent Successfully!</h2>
+        <p><strong>Recipients:</strong> {', '.join(result['recipients'])}</p>
+        <p><strong>Status Code:</strong> {result['status_code']}</p>
+        <p><strong>Subject:</strong> [TEST] Booking Confirmation - Hot Desk #5</p>
+        <hr>
+        <h3>Email Template Preview:</h3>
+        <ul>
+            <li>🎨 Professional HTML formatting</li>
+            <li>📧 From: billing@citydiscoverer.ai</li>
+            <li>↩️ Reply-to: hello@citydiscoverer.ai</li>
+            <li>📋 Sample booking details (Hot Desk #5, 3 hours, $15.00)</li>
+            <li>📍 Location information</li>
+            <li>⚡ Clear TEST indicator at the top</li>
+        </ul>
+        <p>Check your inbox at both email addresses to see how the template looks!</p>
+        <p><a href="/">← Back to EasyDesk</a></p>
+        """
 
 @app.get("/api/availability/<date>")
 def api_availability(date):
