@@ -63,7 +63,12 @@ Simplified calendar interface: Only today shown in olive green, all other dates 
 - **Python libraries**: Flask, SQLAlchemy, python-dotenv, qrcode, Pillow, requests
 - **Environment management**: .env file configuration for secrets and feature flags
 
+### Email Notifications  
+- **SendGrid integration**: Automated booking confirmation emails sent on successful checkout
+- **Dual recipients**: Emails sent to both customer and admin (hello@citydiscoverer.ai)
+- **Professional branding**: Emails from billing@citydiscoverer.ai with hello@citydiscoverer.ai reply-to
+- **Comprehensive details**: HTML emails include booking details, workspace info, timing, and location
+
 ### Optional Integrations
-- **SMTP/SendGrid**: Email receipt delivery when credentials are configured
-- **Calendar exports**: .ics file downloads for individual bookings
+- **Calendar exports**: .ics file downloads for individual bookings  
 - **Webhook endpoints**: Mercury payment confirmation and status updates
