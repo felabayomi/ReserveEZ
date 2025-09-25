@@ -5,6 +5,7 @@ from flask_sqlalchemy import SQLAlchemy
 from dotenv import load_dotenv
 import qrcode
 import requests
+import stripe
 
 load_dotenv()
 
@@ -22,6 +23,10 @@ ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin")
 PROMO_CODE = os.getenv("PROMO_CODE", "EASYWEEK").strip().upper()
 USE_MERCURY = os.getenv("USE_MERCURY", "true").lower() == "true"
 ALLOW_POS_CHECKOUT = os.getenv("ALLOW_POS_CHECKOUT", "true").lower() == "true"
+
+# Stripe configuration
+stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
+YOUR_DOMAIN = os.getenv('REPLIT_DEV_DOMAIN') if os.getenv('REPLIT_DEPLOYMENT') != '' else os.getenv('REPLIT_DOMAINS', 'localhost:5000').split(',')[0]
 
 # ---------------- Models ----------------
 class Resource(db.Model):

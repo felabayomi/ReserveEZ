@@ -10,3 +10,4 @@ Pillow
 python-dotenv
 qrcode
 requests
+stripe
