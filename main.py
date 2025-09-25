@@ -612,6 +612,56 @@ def admin_resource():
     db.session.commit()
     return redirect(url_for("admin_home", key=request.form["key"]))
 
+@app.get("/admin/resource/<int:rid>")
+def admin_resource_edit():
+    admin_guard()
+    resource = Resource.query.get_or_404(rid)
+    return render_template("admin_resource_edit.html", 
+                         resource=resource, 
+                         key=request.args.get("key"),
+                         opening_hours=resource.get_opening_hours())
+
+@app.post("/admin/resource/<int:rid>/update")
+def admin_resource_update(rid):
+    admin_guard()
+    resource = Resource.query.get_or_404(rid)
+    
+    resource.name = request.form["name"].strip()
+    resource.hourly_rate_cents = int(float(request.form["rate"]) * 100)
+    resource.capacity = int(request.form["capacity"])
+    resource.active = "active" in request.form
+    
+    # Update opening hours
+    hours = {}
+    days = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+    for day in days:
+        open_time = request.form.get(f"{day}_open", "")
+        close_time = request.form.get(f"{day}_close", "")
+        if open_time and close_time:
+            hours[day] = [[open_time, close_time]]
+        else:
+            hours[day] = []
+    
+    resource.set_opening_hours(hours)
+    db.session.commit()
+    return redirect(url_for("admin_home", key=request.form["key"]))
+
+@app.post("/admin/resource/<int:rid>/delete")
+def admin_resource_delete(rid):
+    admin_guard()
+    resource = Resource.query.get_or_404(rid)
+    
+    # Check if there are any bookings for this resource
+    booking_count = Booking.query.filter_by(resource_id=rid).count()
+    if booking_count > 0:
+        flash(f"Cannot delete {resource.name} - it has {booking_count} bookings.", "error")
+    else:
+        db.session.delete(resource)
+        db.session.commit()
+        flash(f"Resource {resource.name} deleted successfully.", "success")
+    
+    return redirect(url_for("admin_home", key=request.form["key"]))
+
 @app.post("/admin/resource-toggle")
 def admin_resource_toggle():
     admin_guard()

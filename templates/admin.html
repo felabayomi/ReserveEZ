@@ -28,20 +28,39 @@
           <tr><th>Name</th><th>Rate</th><th>Capacity</th><th>Status</th><th>Actions</th></tr>
           {% for r in resources %}
           <tr>
-            <td>{{ r.name }}</td>
-            <td>${{ "%.2f"|format(r.hourly_rate_cents/100) }}</td>
-            <td>{{ r.capacity }}</td>
+            <td>
+              <strong>{{ r.name }}</strong>
+              <br><small class="text-muted">{{ r.capacity }} seats available</small>
+            </td>
+            <td>${{ "%.2f"|format(r.hourly_rate_cents/100) }}/hr</td>
+            <td>
+              <span class="badge bg-info">{{ r.capacity }}</span>
+            </td>
             <td>
               <span class="badge {{ 'bg-success' if r.active else 'bg-secondary' }}">
                 {{ "Active" if r.active else "Disabled" }}
               </span>
             </td>
             <td>
-              <form method="post" action="/admin/resource-toggle" class="d-inline">
-                <input type="hidden" name="key" value="{{ key }}">
-                <input type="hidden" name="rid" value="{{ r.id }}">
-                <button class="btn btn-outline-secondary btn-sm">Toggle</button>
-              </form>
+              <div class="btn-group btn-group-sm" role="group">
+                <a href="/admin/resource/{{ r.id }}?key={{ key }}" class="btn btn-outline-primary">
+                  ✏️ Edit
+                </a>
+                <form method="post" action="/admin/resource-toggle" class="d-inline">
+                  <input type="hidden" name="key" value="{{ key }}">
+                  <input type="hidden" name="rid" value="{{ r.id }}">
+                  <button class="btn btn-outline-secondary" title="Enable/Disable">
+                    {{ '🔓' if r.active else '🔒' }}
+                  </button>
+                </form>
+                <form method="post" action="/admin/resource/{{ r.id }}/delete" class="d-inline" 
+                      onsubmit="return confirm('Delete {{ r.name }}? This cannot be undone!')">
+                  <input type="hidden" name="key" value="{{ key }}">
+                  <button class="btn btn-outline-danger" title="Delete">
+                    🗑️
+                  </button>
+                </form>
+              </div>
             </td>
           </tr>
           {% endfor %}
