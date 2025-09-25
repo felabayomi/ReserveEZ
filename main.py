@@ -741,28 +741,50 @@ def handle_plan_booking(email, name, resource_id, plan_type, seats, code, paymen
         db.session.commit()
         return redirect(url_for("success_pos", bid=booking.id))
     else:
-        # Mercury online payment
-        if USE_MERCURY and amount_cents > 0:
-            mercury_result = create_mercury_invoice(
-                amount_cents, email,
-                f"{resource.name} ({plan_type} - {seats} seats)",
-                {"type": "booking", "booking_id": booking.id}
-            )
-            
-            if "error" in mercury_result:
+        # Stripe online payment
+        if stripe.api_key and amount_cents > 0:
+            try:
+                # Create Stripe checkout session
+                checkout_session = stripe.checkout.Session.create(
+                    line_items=[
+                        {
+                            'price_data': {
+                                'currency': 'usd',
+                                'product_data': {
+                                    'name': f"{resource.name} - {plan_type.title()} Pass",
+                                    'description': f"{seats} seat(s) for {resource.name}",
+                                },
+                                'unit_amount': amount_cents,
+                            },
+                            'quantity': 1,
+                        },
+                    ],
+                    mode='payment',
+                    customer_email=email,
+                    success_url=f'https://{YOUR_DOMAIN}/success-stripe?session_id={{CHECKOUT_SESSION_ID}}&bid={booking.id}',
+                    cancel_url=f'https://{YOUR_DOMAIN}/book?cancelled=true',
+                    metadata={
+                        'booking_id': str(booking.id),
+                        'email': email,
+                        'resource_name': resource.name,
+                    }
+                )
+                
+                # Save payment record
+                payment = Payment()
+                payment.booking_id = booking.id
+                payment.provider = "stripe"
+                payment.intent_id = checkout_session.id
+                payment.status = "created"
+                payment.amount_cents = amount_cents
+                db.session.add(payment)
+                db.session.commit()
+                
+                return redirect(checkout_session.url)
+                
+            except Exception as e:
                 flash("Payment system unavailable. Please try again.", "error")
                 return redirect(url_for("book_page"))
-            
-            payment = Payment()
-            payment.booking_id = booking.id
-            payment.provider = "mercury"
-            payment.intent_id = mercury_result["intent_id"]
-            payment.status = "created"
-            payment.amount_cents = amount_cents
-            db.session.add(payment)
-            db.session.commit()
-            
-            return redirect(mercury_result["pay_url"])
         else:
             # No payment needed
             booking.status = "confirmed"
@@ -951,6 +973,42 @@ def success_pos_pass():
     pid = int(pid_str)
     pass_obj = Pass.query.get_or_404(pid)
     return render_template("success_pos_pass.html", pass_obj=pass_obj)
+
+@app.get("/success-stripe")
+def success_stripe():
+    """Handle successful Stripe payment"""
+    session_id = request.args.get("session_id")
+    bid_str = request.args.get("bid")
+    
+    if not session_id or not bid_str:
+        abort(400)
+    
+    bid = int(bid_str)
+    booking = Booking.query.get_or_404(bid)
+    
+    # Verify the payment with Stripe
+    try:
+        session = stripe.checkout.Session.retrieve(session_id)
+        if session.payment_status == 'paid':
+            # Update booking status
+            booking.status = "confirmed"
+            
+            # Update payment record
+            payment = Payment.query.filter_by(booking_id=bid, provider="stripe").first()
+            if payment:
+                payment.status = "paid"
+                payment.intent_id = session.payment_intent
+            
+            db.session.commit()
+            
+            return render_template("success.html", booking=booking, as_money=as_money, payment_method="stripe")
+        else:
+            flash("Payment verification failed. Please contact support.", "error")
+            return redirect(url_for("book_page"))
+            
+    except Exception as e:
+        flash("Payment verification error. Please contact support.", "error")
+        return redirect(url_for("book_page"))
 
 @app.get("/cancel")
 def cancel():
