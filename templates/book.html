@@ -242,20 +242,40 @@
           <div class="mb-4">
             <label class="form-label">Payment method</label>
             <div class="form-check">
-              <input class="form-check-input" type="radio" name="payment_method" id="payment-online" value="online" checked>
+              <input class="form-check-input" type="radio" name="payment_method" id="payment-online" value="online" checked onchange="togglePaymentMethod()">
               <label class="form-check-label" for="payment-online">
                 💳 Online payment (Stripe)
               </label>
             </div>
             {% if allow_pos %}
             <div class="form-check">
-              <input class="form-check-input" type="radio" name="payment_method" id="payment-pos" value="pos">
+              <input class="form-check-input" type="radio" name="payment_method" id="payment-pos" value="pos" onchange="togglePaymentMethod()">
               <label class="form-check-label" for="payment-pos">
-                Pay at desk (Chase POS)
+                🏪 Pay at desk (with card hold)
               </label>
             </div>
             {% endif %}
           </div>
+
+          <!-- Card collection for pay-at-desk -->
+          {% if allow_pos %}
+          <div id="card-collection-section" class="mb-4" style="display: none;">
+            <div class="alert alert-info">
+              <h6>💳 Secure your reservation</h6>
+              <p class="mb-2">We'll authorize (but not charge) your card to hold your spot. You'll pay the full amount when you arrive.</p>
+              <small class="text-muted">No charge will be made now. The authorization ensures your reservation and reduces no-shows.</small>
+            </div>
+            <div class="card">
+              <div class="card-body">
+                <h6 class="card-title mb-3">Card Information</h6>
+                <div id="card-element">
+                  <!-- Stripe Elements will create form elements here -->
+                </div>
+                <div id="card-errors" role="alert" class="text-danger mt-2"></div>
+              </div>
+            </div>
+          </div>
+          {% endif %}
 
           <!-- Promo code -->
           <div class="mb-4">
@@ -1259,8 +1279,81 @@ function updateSummary() {
   summaryContainer.innerHTML = summaryHTML;
 }
 
-function submitBooking() {
-  document.getElementById('booking-form').submit();
+// Stripe Elements variables
+let stripe = null;
+let elements = null;
+let cardElement = null;
+
+// Initialize Stripe Elements when page loads
+document.addEventListener('DOMContentLoaded', function() {
+  stripe = Stripe('{{ stripe_public_key }}');
+  elements = stripe.elements();
+  
+  // Create card element
+  cardElement = elements.create('card', {
+    style: {
+      base: {
+        fontSize: '16px',
+        color: '#424770',
+        '::placeholder': {
+          color: '#aab7c4',
+        },
+      },
+    },
+  });
+  
+  // Mount card element
+  cardElement.mount('#card-element');
+  
+  // Handle real-time validation errors from the card Element
+  cardElement.on('change', function(event) {
+    const displayError = document.getElementById('card-errors');
+    if (event.error) {
+      displayError.textContent = event.error.message;
+    } else {
+      displayError.textContent = '';
+    }
+  });
+});
+
+function togglePaymentMethod() {
+  const payAtDesk = document.getElementById('payment-pos').checked;
+  const cardSection = document.getElementById('card-collection-section');
+  
+  if (payAtDesk) {
+    cardSection.style.display = 'block';
+  } else {
+    cardSection.style.display = 'none';
+  }
+}
+
+async function submitBooking() {
+  const payAtDesk = document.getElementById('payment-pos').checked;
+  
+  if (payAtDesk) {
+    // Handle card authorization for pay-at-desk
+    const { token, error } = await stripe.createToken(cardElement);
+    
+    if (error) {
+      // Show error to customer
+      const errorElement = document.getElementById('card-errors');
+      errorElement.textContent = error.message;
+      return;
+    } else {
+      // Add token to form and submit
+      const form = document.getElementById('booking-form');
+      const tokenInput = document.createElement('input');
+      tokenInput.type = 'hidden';
+      tokenInput.name = 'stripe_token';
+      tokenInput.value = token.id;
+      form.appendChild(tokenInput);
+      
+      form.submit();
+    }
+  } else {
+    // Regular online payment
+    document.getElementById('booking-form').submit();
+  }
 }
 
 // Add styling for interactive elements and calendar
