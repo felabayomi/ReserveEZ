@@ -246,23 +246,32 @@ def send_booking_confirmation_email(booking):
         </html>
         """
         
-        # Create the email message
-        message = Mail(
+        # Send separate emails to customer and admin for better deliverability
+        # Customer email
+        customer_message = Mail(
             from_email=Email("billing@citydiscoverer.ai", "EasyDesk Booking System"),
-            to_emails=[
-                To(booking.customer_email),  # Customer email
-                To("hello@citydiscoverer.ai")  # Admin email
-            ],
+            to_emails=To(booking.customer_email),
             subject=subject,
             html_content=Content("text/html", html_content)
         )
+        customer_message.reply_to = Email("hello@citydiscoverer.ai")
         
-        # Set reply-to address
-        message.reply_to = Email("hello@citydiscoverer.ai")
+        # Admin email with [ADMIN COPY] prefix
+        admin_subject = f"[ADMIN COPY] {subject}"
+        admin_message = Mail(
+            from_email=Email("billing@citydiscoverer.ai", "EasyDesk Booking System"),
+            to_emails=To("hello@citydiscoverer.ai"),
+            subject=admin_subject,
+            html_content=Content("text/html", html_content)
+        )
+        admin_message.reply_to = Email("hello@citydiscoverer.ai")
         
-        # Send the email
-        response = sg.send(message)
-        print(f"Email sent successfully! Status code: {response.status_code}")
+        # Send both emails
+        customer_response = sg.send(customer_message)
+        admin_response = sg.send(admin_message)
+        
+        print(f"Customer email sent! Status: {customer_response.status_code}")
+        print(f"Admin email sent! Status: {admin_response.status_code}")
         return True
         
     except Exception as e:
@@ -352,21 +361,35 @@ def send_test_emails(test_emails):
         </html>
         """
         
-        # Create the email message
-        message = Mail(
+        # Create separate emails for customer and admin to ensure both are delivered
+        # Send to customer first
+        customer_message = Mail(
             from_email=Email("billing@citydiscoverer.ai", "EasyDesk Booking System"),
-            to_emails=[To(email) for email in test_emails],
+            to_emails=To(test_emails[0]),  # Customer email
             subject=subject,
             html_content=Content("text/html", html_content)
         )
+        customer_message.reply_to = Email("hello@citydiscoverer.ai")
         
-        # Set reply-to address
-        message.reply_to = Email("hello@citydiscoverer.ai")
+        # Send to admin
+        admin_subject = f"[ADMIN COPY] {subject}"
+        admin_message = Mail(
+            from_email=Email("billing@citydiscoverer.ai", "EasyDesk Booking System"),
+            to_emails=To("hello@citydiscoverer.ai"),  # Admin email
+            subject=admin_subject,
+            html_content=Content("text/html", html_content)
+        )
+        admin_message.reply_to = Email("hello@citydiscoverer.ai")
         
-        # Send the email
-        response = sg.send(message)
-        print(f"Test emails sent successfully! Status code: {response.status_code}")
-        return {"success": True, "status_code": response.status_code, "recipients": test_emails}
+        # Send customer email
+        customer_response = sg.send(customer_message)
+        print(f"Customer test email sent! Status code: {customer_response.status_code}")
+        
+        # Send admin email
+        admin_response = sg.send(admin_message)
+        print(f"Admin test email sent! Status code: {admin_response.status_code}")
+        
+        return {"success": True, "customer_status": customer_response.status_code, "admin_status": admin_response.status_code, "recipients": test_emails + ["hello@citydiscoverer.ai"]}
         
     except Exception as e:
         print(f"Failed to send test emails: {str(e)}")
