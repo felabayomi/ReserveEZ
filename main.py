@@ -100,6 +100,8 @@ class Booking(db.Model):
     promo_applied = db.Column(db.String(40))
     pass_id = db.Column(db.Integer, db.ForeignKey("pass.id"), nullable=True)
     created_at = db.Column(db.DateTime, default=dt.datetime.utcnow)
+    reminder_24h_sent = db.Column(db.Boolean, default=False)
+    reminder_2h_sent = db.Column(db.Boolean, default=False)
 
     resource = db.relationship("Resource")
 
@@ -393,6 +395,158 @@ def send_test_emails(test_emails):
         
     except Exception as e:
         print(f"Failed to send test emails: {str(e)}")
+        return {"error": str(e)}
+
+def send_booking_reminder(booking, hours_before):
+    """Send booking reminder email to customer and admin"""
+    if not SENDGRID_API_KEY:
+        print("SendGrid API key not configured, skipping reminder email")
+        return False
+    
+    try:
+        sg = SendGridAPIClient(SENDGRID_API_KEY)
+        
+        # Determine reminder type and message
+        if hours_before == 24:
+            reminder_type = "24-Hour"
+            time_text = "tomorrow"
+            urgency_color = "#17a2b8"  # Blue
+            icon = "📅"
+        else:  # 2 hours
+            reminder_type = "2-Hour"
+            time_text = "in 2 hours"
+            urgency_color = "#fd7e14"  # Orange
+            icon = "⏰"
+        
+        subject = f"{reminder_type} Reminder: Your {booking.resource.name} booking starts {time_text}"
+        
+        # Create HTML content for reminder
+        html_content = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="background-color: {urgency_color}; color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; text-align: center;">
+                <h2 style="margin: 0; font-size: 24px;">{icon} Booking Reminder</h2>
+                <p style="margin: 10px 0 0 0; font-size: 16px;">Your workspace is reserved {time_text}!</p>
+            </div>
+            
+            <div style="background-color: #ffffff; border: 1px solid #dee2e6; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+                <h3 style="color: #495057; margin-top: 0;">Booking Details</h3>
+                <table style="width: 100%; border-collapse: collapse;">
+                    <tr style="border-bottom: 1px solid #dee2e6;">
+                        <td style="padding: 8px 0; font-weight: bold; color: #6c757d;">Workspace:</td>
+                        <td style="padding: 8px 0;">{booking.resource.name}</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid #dee2e6;">
+                        <td style="padding: 8px 0; font-weight: bold; color: #6c757d;">Customer:</td>
+                        <td style="padding: 8px 0;">{booking.email}</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid #dee2e6;">
+                        <td style="padding: 8px 0; font-weight: bold; color: #6c757d;">Date & Time:</td>
+                        <td style="padding: 8px 0;">{booking.start_dt.strftime('%B %d, %Y at %I:%M %p')} - {booking.end_dt.strftime('%I:%M %p')}</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid #dee2e6;">
+                        <td style="padding: 8px 0; font-weight: bold; color: #6c757d;">Duration:</td>
+                        <td style="padding: 8px 0;">{int(booking.hours)} hours</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 0; font-weight: bold; color: #6c757d;">Seats:</td>
+                        <td style="padding: 8px 0;">{booking.seats}</td>
+                    </tr>
+                </table>
+            </div>
+            
+            <div style="background-color: #e9ecef; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <p style="margin: 0; font-size: 14px; color: #6c757d;">
+                    <strong>Location:</strong> City Discoverer<br>
+                    50 Stately St, Suite 2, Wiley Ford WV 26767
+                </p>
+            </div>
+            
+            <div style="background-color: #d4edda; border: 1px solid #c3e6cb; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <h4 style="margin: 0 0 10px 0; color: #155724;">💡 Getting Ready?</h4>
+                <ul style="margin: 0; padding-left: 20px; color: #155724;">
+                    <li>Arrive 5-10 minutes early for check-in</li>
+                    <li>Bring your laptop and any work materials</li>
+                    <li>Free WiFi and power outlets available</li>
+                    <li>Questions? Reply to this email</li>
+                </ul>
+            </div>
+            
+            <div style="text-align: center; color: #6c757d; font-size: 12px; margin-top: 30px;">
+                <p>Need to cancel or modify? Reply to this email or contact us at hello@citydiscoverer.ai</p>
+            </div>
+        </body>
+        </html>
+        """
+        
+        # Send to customer
+        customer_message = Mail(
+            from_email=Email("billing@citydiscoverer.ai", "EasyDesk Booking System"),
+            to_emails=To(booking.email),
+            subject=subject,
+            html_content=Content("text/html", html_content)
+        )
+        customer_message.reply_to = Email("hello@citydiscoverer.ai")
+        
+        # Send to admin with prefix
+        admin_subject = f"[ADMIN] {subject}"
+        admin_message = Mail(
+            from_email=Email("billing@citydiscoverer.ai", "EasyDesk Booking System"),
+            to_emails=To("hello@citydiscoverer.ai"),
+            subject=admin_subject,
+            html_content=Content("text/html", html_content)
+        )
+        admin_message.reply_to = Email("hello@citydiscoverer.ai")
+        
+        # Send both emails
+        customer_response = sg.send(customer_message)
+        admin_response = sg.send(admin_message)
+        
+        print(f"{reminder_type} reminder sent! Customer: {customer_response.status_code}, Admin: {admin_response.status_code}")
+        return True
+        
+    except Exception as e:
+        print(f"Failed to send {reminder_type.lower()} reminder: {str(e)}")
+        return False
+
+def check_and_send_reminders():
+    """Check for upcoming bookings and send reminders"""
+    try:
+        now = dt.datetime.utcnow()
+        
+        # Check for 24-hour reminders
+        reminder_24h_time = now + dt.timedelta(hours=24)
+        bookings_24h = Booking.query.filter(
+            Booking.status.in_(["confirmed", "paid", "free"]),
+            Booking.start_dt.between(now + dt.timedelta(hours=23), now + dt.timedelta(hours=25)),
+            Booking.reminder_24h_sent == False
+        ).all()
+        
+        for booking in bookings_24h:
+            if send_booking_reminder(booking, 24):
+                booking.reminder_24h_sent = True
+                db.session.commit()
+        
+        # Check for 2-hour reminders
+        bookings_2h = Booking.query.filter(
+            Booking.status.in_(["confirmed", "paid", "free"]),
+            Booking.start_dt.between(now + dt.timedelta(hours=1, minutes=30), now + dt.timedelta(hours=2, minutes=30)),
+            Booking.reminder_2h_sent == False
+        ).all()
+        
+        for booking in bookings_2h:
+            if send_booking_reminder(booking, 2):
+                booking.reminder_2h_sent = True
+                db.session.commit()
+        
+        total_sent = len(bookings_24h) + len(bookings_2h)
+        if total_sent > 0:
+            print(f"Sent {total_sent} reminder emails: {len(bookings_24h)} 24h, {len(bookings_2h)} 2h")
+        
+        return {"sent_24h": len(bookings_24h), "sent_2h": len(bookings_2h)}
+        
+    except Exception as e:
+        print(f"Error checking reminders: {str(e)}")
         return {"error": str(e)}
 
 def user_has_used_promo(email: str, code: str) -> bool:
@@ -1286,6 +1440,24 @@ def test_emails():
             <li>⚡ Clear TEST indicator at the top</li>
         </ul>
         <p>Check your inbox at both email addresses to see how the template looks!</p>
+        <p><a href="/">← Back to EasyDesk</a></p>
+        """
+
+@app.get("/check-reminders")
+def manual_check_reminders():
+    """Manually trigger reminder checking (for testing and cron jobs)"""
+    result = check_and_send_reminders()
+    
+    if "error" in result:
+        return f"<h2>❌ Reminder Check Failed</h2><p>Error: {result['error']}</p>", 500
+    else:
+        return f"""
+        <h2>✅ Reminder Check Complete</h2>
+        <p><strong>24-hour reminders sent:</strong> {result['sent_24h']}</p>
+        <p><strong>2-hour reminders sent:</strong> {result['sent_2h']}</p>
+        <p><strong>Total reminders:</strong> {result['sent_24h'] + result['sent_2h']}</p>
+        <hr>
+        <p>This endpoint should be called regularly (every hour) for automatic reminders.</p>
         <p><a href="/">← Back to EasyDesk</a></p>
         """
 
