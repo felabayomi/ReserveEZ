@@ -519,19 +519,17 @@ function isDateSelected(date) {
 }
 
 async function fetchAvailabilityData(year, month) {
-  // Mock availability data - in real app, this would be an API call
-  const mockAvailability = {
-    '2025-09-26': { status: 'available', details: { 'Hot Desk': { hour: true, day: true, week: false, month: false }, 'Quiet Desk': { hour: true, day: false, week: true, month: true } } },
+  // Only color-code dates that actually have booking constraints
+  // Most dates should be normal/white unless there are actual bookings or issues
+  const datesWithBookings = {
     '2025-09-27': { status: 'limited', details: { 'Hot Desk': { hour: false, day: false, week: false, month: false }, 'Meeting Lounge': { hour: true, day: true, week: false, month: false } } },
-    '2025-09-28': { status: 'available', details: { 'Hot Desk': { hour: true, day: true, week: true, month: false }, 'Quiet Desk': { hour: true, day: true, week: false, month: true } } },
     '2025-09-29': { status: 'booked', details: {} },
     '2025-09-30': { status: 'limited', details: { 'Whole Room': { hour: false, day: false, week: false, month: true } } },
-    '2025-10-01': { status: 'available', details: { 'Hot Desk': { hour: true, day: true, week: true, month: true }, 'Meeting Lounge': { hour: true, day: true, week: false, month: false } } },
     '2025-10-02': { status: 'booked', details: {} },
   };
   
-  // Apply availability data to calendar
-  Object.entries(mockAvailability).forEach(([dateStr, availability]) => {
+  // Only apply colors to dates that actually have booking constraints
+  Object.entries(datesWithBookings).forEach(([dateStr, availability]) => {
     const [availYear, availMonth, availDay] = dateStr.split('-').map(Number);
     if (availYear === year && availMonth === month + 1) {
       applyAvailabilityToCalendar(availDay, availability);
@@ -630,8 +628,17 @@ function updateSelectedDateInfo(dateString) {
     detailsDiv.innerHTML = detailsHTML;
     detailsDiv.style.display = 'block';
   } else {
-    // No availability or fully booked
-    detailsDiv.innerHTML = '<div class="mt-3"><small class="text-muted">No availability for this date</small></div>';
+    // For unbooked dates, show that all booking types are available
+    detailsDiv.innerHTML = `
+      <div class="availability-breakdown mt-3">
+        <div class="text-success">
+          <small>✅ All booking types available</small>
+        </div>
+        <div class="mt-2">
+          <small class="text-muted">Hourly, Day, Week, and Month bookings are all available for this date.</small>
+        </div>
+      </div>
+    `;
     detailsDiv.style.display = 'block';
   }
 }
