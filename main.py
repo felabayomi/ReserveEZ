@@ -73,6 +73,9 @@ class Pass(db.Model):
     valid_from = db.Column(db.DateTime, nullable=False)
     valid_to = db.Column(db.DateTime, nullable=False)
     status = db.Column(db.String(20), default="active")  # active, expired, refunded
+    purchase_email_sent = db.Column(db.Boolean, default=False)
+    activation_email_sent = db.Column(db.Boolean, default=False)
+    expiration_warning_sent = db.Column(db.Boolean, default=False)
 
 class Payment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -506,7 +509,8 @@ def send_booking_reminder(booking, hours_before):
         return True
         
     except Exception as e:
-        print(f"Failed to send {reminder_type.lower()} reminder: {str(e)}")
+        reminder_desc = "24-hour" if hours_before == 24 else "2-hour"
+        print(f"Failed to send {reminder_desc} reminder: {str(e)}")
         return False
 
 def check_and_send_reminders():
@@ -547,6 +551,253 @@ def check_and_send_reminders():
         
     except Exception as e:
         print(f"Error checking reminders: {str(e)}")
+        return {"error": str(e)}
+
+def send_pass_purchase_confirmation(pass_obj):
+    """Send pass purchase confirmation email"""
+    if not SENDGRID_API_KEY:
+        print("SendGrid API key not configured, skipping pass confirmation email")
+        return False
+    
+    try:
+        sg = SendGridAPIClient(SENDGRID_API_KEY)
+        
+        # Determine pass details
+        pass_type_display = pass_obj.pass_type.title()
+        pass_icon = {"day": "📅", "week": "📆", "month": "🗓️"}.get(pass_obj.pass_type, "🎫")
+        
+        # Calculate pass value and duration
+        duration_text = {"day": "1 day", "week": "7 days", "month": "30 days"}[pass_obj.pass_type]
+        
+        subject = f"{pass_type_display} Pass Purchased - Unlimited Bookings!"
+        
+        html_content = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="background-color: #28a745; color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; text-align: center;">
+                <h2 style="margin: 0; font-size: 24px;">{pass_icon} Pass Purchase Confirmed!</h2>
+                <p style="margin: 10px 0 0 0; font-size: 16px;">Your {pass_type_display} Pass is ready to use</p>
+            </div>
+            
+            <div style="background-color: #ffffff; border: 1px solid #dee2e6; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+                <h3 style="color: #495057; margin-top: 0;">Pass Details</h3>
+                <table style="width: 100%; border-collapse: collapse;">
+                    <tr style="border-bottom: 1px solid #dee2e6;">
+                        <td style="padding: 8px 0; font-weight: bold; color: #6c757d;">Pass Type:</td>
+                        <td style="padding: 8px 0;">{pass_type_display} Pass</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid #dee2e6;">
+                        <td style="padding: 8px 0; font-weight: bold; color: #6c757d;">Email:</td>
+                        <td style="padding: 8px 0;">{pass_obj.email}</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid #dee2e6;">
+                        <td style="padding: 8px 0; font-weight: bold; color: #6c757d;">Valid From:</td>
+                        <td style="padding: 8px 0;">{pass_obj.valid_from.strftime('%B %d, %Y at %I:%M %p')}</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid #dee2e6;">
+                        <td style="padding: 8px 0; font-weight: bold; color: #6c757d;">Valid Until:</td>
+                        <td style="padding: 8px 0;">{pass_obj.valid_to.strftime('%B %d, %Y at %I:%M %p')}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 0; font-weight: bold; color: #6c757d;">Duration:</td>
+                        <td style="padding: 8px 0;">{duration_text}</td>
+                    </tr>
+                </table>
+            </div>
+            
+            <div style="background-color: #d1ecf1; border: 1px solid #bee5eb; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <h4 style="margin: 0 0 10px 0; color: #0c5460;">🚀 How to Use Your Pass</h4>
+                <ul style="margin: 0; padding-left: 20px; color: #0c5460;">
+                    <li>Book any workspace during your pass validity period</li>
+                    <li>No booking fees during pass period</li>
+                    <li>Cancel and rebook freely within hours</li>
+                    <li>Pass activates automatically at start time</li>
+                </ul>
+            </div>
+            
+            <div style="background-color: #e9ecef; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <p style="margin: 0; font-size: 14px; color: #6c757d;">
+                    <strong>Location:</strong> City Discoverer<br>
+                    50 Stately St, Suite 2, Wiley Ford WV 26767
+                </p>
+            </div>
+            
+            <div style="text-align: center; margin: 20px 0;">
+                <a href="#" style="background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Start Booking Now</a>
+            </div>
+            
+            <div style="text-align: center; color: #6c757d; font-size: 12px; margin-top: 30px;">
+                <p>Questions about your pass? Reply to this email or contact us at hello@citydiscoverer.ai</p>
+            </div>
+        </body>
+        </html>
+        """
+        
+        # Send to customer
+        customer_message = Mail(
+            from_email=Email("billing@citydiscoverer.ai", "EasyDesk Booking System"),
+            to_emails=To(pass_obj.email),
+            subject=subject,
+            html_content=Content("text/html", html_content)
+        )
+        customer_message.reply_to = Email("hello@citydiscoverer.ai")
+        
+        # Send to admin
+        admin_subject = f"[ADMIN] {subject}"
+        admin_message = Mail(
+            from_email=Email("billing@citydiscoverer.ai", "EasyDesk Booking System"),
+            to_emails=To("hello@citydiscoverer.ai"),
+            subject=admin_subject,
+            html_content=Content("text/html", html_content)
+        )
+        admin_message.reply_to = Email("hello@citydiscoverer.ai")
+        
+        # Send both emails
+        customer_response = sg.send(customer_message)
+        admin_response = sg.send(admin_message)
+        
+        print(f"Pass purchase confirmation sent! Customer: {customer_response.status_code}, Admin: {admin_response.status_code}")
+        return True
+        
+    except Exception as e:
+        print(f"Failed to send pass purchase confirmation: {str(e)}")
+        return False
+
+def send_pass_expiration_warning(pass_obj):
+    """Send pass expiration warning email (2 days before expiry)"""
+    if not SENDGRID_API_KEY:
+        print("SendGrid API key not configured, skipping expiration warning")
+        return False
+    
+    try:
+        sg = SendGridAPIClient(SENDGRID_API_KEY)
+        
+        pass_type_display = pass_obj.pass_type.title()
+        pass_icon = {"day": "📅", "week": "📆", "month": "🗓️"}.get(pass_obj.pass_type, "🎫")
+        
+        subject = f"⚠️ Your {pass_type_display} Pass Expires in 2 Days"
+        
+        html_content = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="background-color: #ffc107; color: #212529; padding: 20px; border-radius: 8px; margin-bottom: 20px; text-align: center;">
+                <h2 style="margin: 0; font-size: 24px;">⚠️ Pass Expiring Soon</h2>
+                <p style="margin: 10px 0 0 0; font-size: 16px;">Your {pass_type_display} Pass expires in 2 days</p>
+            </div>
+            
+            <div style="background-color: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <h4 style="margin: 0 0 10px 0; color: #856404;">🕒 Time Remaining</h4>
+                <p style="margin: 0; color: #856404;">
+                    Your pass expires on <strong>{pass_obj.valid_to.strftime('%B %d, %Y at %I:%M %p')}</strong>
+                </p>
+            </div>
+            
+            <div style="background-color: #ffffff; border: 1px solid #dee2e6; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+                <h3 style="color: #495057; margin-top: 0;">Pass Information</h3>
+                <table style="width: 100%; border-collapse: collapse;">
+                    <tr style="border-bottom: 1px solid #dee2e6;">
+                        <td style="padding: 8px 0; font-weight: bold; color: #6c757d;">Pass Type:</td>
+                        <td style="padding: 8px 0;">{pass_icon} {pass_type_display} Pass</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid #dee2e6;">
+                        <td style="padding: 8px 0; font-weight: bold; color: #6c757d;">Status:</td>
+                        <td style="padding: 8px 0;">Active</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 0; font-weight: bold; color: #6c757d;">Expires:</td>
+                        <td style="padding: 8px 0; color: #dc3545; font-weight: bold;">{pass_obj.valid_to.strftime('%B %d, %Y at %I:%M %p')}</td>
+                    </tr>
+                </table>
+            </div>
+            
+            <div style="background-color: #d4edda; border: 1px solid #c3e6cb; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <h4 style="margin: 0 0 10px 0; color: #155724;">💡 Make the Most of Your Pass</h4>
+                <ul style="margin: 0; padding-left: 20px; color: #155724;">
+                    <li>Book your remaining sessions now</li>
+                    <li>No booking fees until expiry</li>
+                    <li>Consider purchasing a new pass before this one expires</li>
+                </ul>
+            </div>
+            
+            <div style="text-align: center; margin: 20px 0;">
+                <a href="#" style="background-color: #28a745; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-right: 10px;">Book Now</a>
+                <a href="#" style="background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Renew Pass</a>
+            </div>
+            
+            <div style="text-align: center; color: #6c757d; font-size: 12px; margin-top: 30px;">
+                <p>Questions? Reply to this email or contact us at hello@citydiscoverer.ai</p>
+            </div>
+        </body>
+        </html>
+        """
+        
+        # Send to customer
+        customer_message = Mail(
+            from_email=Email("billing@citydiscoverer.ai", "EasyDesk Booking System"),
+            to_emails=To(pass_obj.email),
+            subject=subject,
+            html_content=Content("text/html", html_content)
+        )
+        customer_message.reply_to = Email("hello@citydiscoverer.ai")
+        
+        # Send to admin
+        admin_subject = f"[ADMIN] {subject}"
+        admin_message = Mail(
+            from_email=Email("billing@citydiscoverer.ai", "EasyDesk Booking System"),
+            to_emails=To("hello@citydiscoverer.ai"),
+            subject=admin_subject,
+            html_content=Content("text/html", html_content)
+        )
+        admin_message.reply_to = Email("hello@citydiscoverer.ai")
+        
+        # Send both emails
+        customer_response = sg.send(customer_message)
+        admin_response = sg.send(admin_message)
+        
+        print(f"Pass expiration warning sent! Customer: {customer_response.status_code}, Admin: {admin_response.status_code}")
+        return True
+        
+    except Exception as e:
+        print(f"Failed to send pass expiration warning: {str(e)}")
+        return False
+
+def check_and_send_pass_notifications():
+    """Check for pass purchase confirmations and expiration warnings"""
+    try:
+        # Check for passes that need purchase confirmation
+        pending_confirmations = Pass.query.filter(
+            Pass.purchase_email_sent == False,
+            Pass.status == "active"
+        ).all()
+        
+        for pass_obj in pending_confirmations:
+            if send_pass_purchase_confirmation(pass_obj):
+                pass_obj.purchase_email_sent = True
+                db.session.commit()
+        
+        # Check for passes expiring in 2 days
+        two_days_from_now = dt.datetime.utcnow() + dt.timedelta(days=2)
+        one_day_from_now = dt.datetime.utcnow() + dt.timedelta(days=1)
+        
+        expiring_passes = Pass.query.filter(
+            Pass.status == "active",
+            Pass.valid_to.between(one_day_from_now, two_days_from_now),
+            Pass.expiration_warning_sent == False
+        ).all()
+        
+        for pass_obj in expiring_passes:
+            if send_pass_expiration_warning(pass_obj):
+                pass_obj.expiration_warning_sent = True
+                db.session.commit()
+        
+        total_sent = len(pending_confirmations) + len(expiring_passes)
+        if total_sent > 0:
+            print(f"Sent {total_sent} pass emails: {len(pending_confirmations)} confirmations, {len(expiring_passes)} warnings")
+        
+        return {"sent_confirmations": len(pending_confirmations), "sent_warnings": len(expiring_passes)}
+        
+    except Exception as e:
+        print(f"Error checking pass notifications: {str(e)}")
         return {"error": str(e)}
 
 def user_has_used_promo(email: str, code: str) -> bool:
@@ -1455,9 +1706,27 @@ def manual_check_reminders():
         <h2>✅ Reminder Check Complete</h2>
         <p><strong>24-hour reminders sent:</strong> {result['sent_24h']}</p>
         <p><strong>2-hour reminders sent:</strong> {result['sent_2h']}</p>
-        <p><strong>Total reminders:</strong> {result['sent_24h'] + result['sent_2h']}</p>
+        <p><strong>Total reminders:</strong> {int(result['sent_24h']) + int(result['sent_2h'])}</p>
         <hr>
         <p>This endpoint should be called regularly (every hour) for automatic reminders.</p>
+        <p><a href="/">← Back to EasyDesk</a></p>
+        """
+
+@app.get("/check-pass-notifications")
+def manual_check_pass_notifications():
+    """Manually trigger pass notification checking"""
+    result = check_and_send_pass_notifications()
+    
+    if "error" in result:
+        return f"<h2>❌ Pass Notification Check Failed</h2><p>Error: {result['error']}</p>", 500
+    else:
+        return f"""
+        <h2>✅ Pass Notification Check Complete</h2>
+        <p><strong>Purchase confirmations sent:</strong> {result['sent_confirmations']}</p>
+        <p><strong>Expiration warnings sent:</strong> {result['sent_warnings']}</p>
+        <p><strong>Total notifications:</strong> {int(result['sent_confirmations']) + int(result['sent_warnings'])}</p>
+        <hr>
+        <p>This endpoint should be called regularly for automatic pass notifications.</p>
         <p><a href="/">← Back to EasyDesk</a></p>
         """
 
