@@ -1031,6 +1031,252 @@ def send_refund_confirmation_email(booking_or_pass, refund_amount_cents, refund_
         print(f"Failed to send refund confirmation email: {str(e)}")
         return False
 
+def send_booking_cancellation_email(booking, cancellation_reason="", refund_amount_cents=0):
+    """Send booking cancellation confirmation email"""
+    if not SENDGRID_API_KEY:
+        print("SendGrid API key not configured, skipping cancellation email")
+        return False
+    
+    try:
+        sg = SendGridAPIClient(SENDGRID_API_KEY)
+        
+        subject = f"Booking Cancelled - {booking.resource.name}"
+        
+        html_content = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="background-color: #ffc107; color: #212529; padding: 20px; border-radius: 8px; margin-bottom: 20px; text-align: center;">
+                <h2 style="margin: 0; font-size: 24px;">📅 Booking Cancelled</h2>
+                <p style="margin: 10px 0 0 0; font-size: 16px;">Your booking has been successfully cancelled</p>
+            </div>
+            
+            <div style="background-color: #ffffff; border: 1px solid #dee2e6; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+                <h3 style="color: #495057; margin-top: 0;">Cancelled Booking Details</h3>
+                <table style="width: 100%; border-collapse: collapse;">
+                    <tr style="border-bottom: 1px solid #dee2e6;">
+                        <td style="padding: 8px 0; font-weight: bold; color: #6c757d;">Workspace:</td>
+                        <td style="padding: 8px 0;">{booking.resource.name}</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid #dee2e6;">
+                        <td style="padding: 8px 0; font-weight: bold; color: #6c757d;">Email:</td>
+                        <td style="padding: 8px 0;">{booking.email}</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid #dee2e6;">
+                        <td style="padding: 8px 0; font-weight: bold; color: #6c757d;">Original Date:</td>
+                        <td style="padding: 8px 0;">{booking.start_dt.strftime('%B %d, %Y')}</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid #dee2e6;">
+                        <td style="padding: 8px 0; font-weight: bold; color: #6c757d;">Original Time:</td>
+                        <td style="padding: 8px 0;">{booking.start_dt.strftime('%I:%M %p')} - {booking.end_dt.strftime('%I:%M %p')}</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid #dee2e6;">
+                        <td style="padding: 8px 0; font-weight: bold; color: #6c757d;">Duration:</td>
+                        <td style="padding: 8px 0;">{booking.duration_hours} hour{"s" if booking.duration_hours > 1 else ""}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 0; font-weight: bold; color: #6c757d;">Status:</td>
+                        <td style="padding: 8px 0; color: #dc3545; font-weight: bold;">CANCELLED</td>
+                    </tr>
+                </table>
+            </div>
+            
+            {f'''<div style="background-color: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <h4 style="margin: 0 0 10px 0; color: #856404;">📝 Cancellation Reason</h4>
+                <p style="margin: 0; color: #856404;">{cancellation_reason}</p>
+            </div>''' if cancellation_reason else ''}
+            
+            {f'''<div style="background-color: #d4edda; border: 1px solid #c3e6cb; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <h4 style="margin: 0 0 10px 0; color: #155724;">💰 Refund Information</h4>
+                <p style="margin: 0; color: #155724;">
+                    A refund of <strong>{as_money(refund_amount_cents)}</strong> will be processed to your original payment method within 3-5 business days.
+                </p>
+            </div>''' if refund_amount_cents > 0 else ''}
+            
+            <div style="background-color: #d1ecf1; border: 1px solid #bee5eb; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <h4 style="margin: 0 0 10px 0; color: #0c5460;">🔄 Next Steps</h4>
+                <ul style="margin: 0; padding-left: 20px; color: #0c5460;">
+                    <li>Your booking slot is now available for other customers</li>
+                    <li>You can book again anytime at your convenience</li>
+                    <li>Consider our passes for unlimited bookings</li>
+                    <li>Questions? Reply to this email</li>
+                </ul>
+            </div>
+            
+            <div style="background-color: #e9ecef; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <p style="margin: 0; font-size: 14px; color: #6c757d;">
+                    <strong>Location:</strong> City Discoverer<br>
+                    50 Stately St, Suite 2, Wiley Ford WV 26767
+                </p>
+            </div>
+            
+            <div style="text-align: center; margin: 20px 0;">
+                <a href="#" style="background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-right: 10px;">Book Again</a>
+                <a href="#" style="background-color: #28a745; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">View Passes</a>
+            </div>
+            
+            <div style="text-align: center; color: #6c757d; font-size: 12px; margin-top: 30px;">
+                <p>Questions about your cancellation? Reply to this email or contact us at hello@citydiscoverer.ai</p>
+            </div>
+        </body>
+        </html>
+        """
+        
+        # Send to customer
+        customer_message = Mail(
+            from_email=Email("billing@citydiscoverer.ai", "EasyDesk Booking System"),
+            to_emails=To(booking.email),
+            subject=subject,
+            html_content=Content("text/html", html_content)
+        )
+        customer_message.reply_to = Email("hello@citydiscoverer.ai")
+        
+        # Send to admin
+        admin_subject = f"[ADMIN] Booking Cancelled - {booking.resource.name}"
+        admin_message = Mail(
+            from_email=Email("billing@citydiscoverer.ai", "EasyDesk Booking System"),
+            to_emails=To("hello@citydiscoverer.ai"),
+            subject=admin_subject,
+            html_content=Content("text/html", html_content)
+        )
+        admin_message.reply_to = Email("hello@citydiscoverer.ai")
+        
+        # Send both emails
+        customer_response = sg.send(customer_message)
+        admin_response = sg.send(admin_message)
+        
+        print(f"Booking cancellation email sent! Customer: {customer_response.status_code}, Admin: {admin_response.status_code}")
+        return True
+        
+    except Exception as e:
+        print(f"Failed to send booking cancellation email: {str(e)}")
+        return False
+
+def send_booking_modification_email(booking, original_booking_data, modification_reason=""):
+    """Send booking modification confirmation email"""
+    if not SENDGRID_API_KEY:
+        print("SendGrid API key not configured, skipping modification email")
+        return False
+    
+    try:
+        sg = SendGridAPIClient(SENDGRID_API_KEY)
+        
+        subject = f"Booking Modified - {booking.resource.name}"
+        
+        html_content = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="background-color: #17a2b8; color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; text-align: center;">
+                <h2 style="margin: 0; font-size: 24px;">📝 Booking Modified</h2>
+                <p style="margin: 10px 0 0 0; font-size: 16px;">Your booking details have been updated</p>
+            </div>
+            
+            <div style="background-color: #ffffff; border: 1px solid #dee2e6; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+                <h3 style="color: #495057; margin-top: 0;">Updated Booking Details</h3>
+                <table style="width: 100%; border-collapse: collapse;">
+                    <tr style="border-bottom: 1px solid #dee2e6;">
+                        <td style="padding: 8px 0; font-weight: bold; color: #6c757d;">Workspace:</td>
+                        <td style="padding: 8px 0;">{booking.resource.name}</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid #dee2e6;">
+                        <td style="padding: 8px 0; font-weight: bold; color: #6c757d;">Email:</td>
+                        <td style="padding: 8px 0;">{booking.email}</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid #dee2e6;">
+                        <td style="padding: 8px 0; font-weight: bold; color: #6c757d;">New Date:</td>
+                        <td style="padding: 8px 0; color: #28a745; font-weight: bold;">{booking.start_dt.strftime('%B %d, %Y')}</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid #dee2e6;">
+                        <td style="padding: 8px 0; font-weight: bold; color: #6c757d;">New Time:</td>
+                        <td style="padding: 8px 0; color: #28a745; font-weight: bold;">{booking.start_dt.strftime('%I:%M %p')} - {booking.end_dt.strftime('%I:%M %p')}</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid #dee2e6;">
+                        <td style="padding: 8px 0; font-weight: bold; color: #6c757d;">Duration:</td>
+                        <td style="padding: 8px 0;">{booking.duration_hours} hour{"s" if booking.duration_hours > 1 else ""}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 0; font-weight: bold; color: #6c757d;">Status:</td>
+                        <td style="padding: 8px 0; color: #28a745; font-weight: bold;">CONFIRMED</td>
+                    </tr>
+                </table>
+            </div>
+            
+            {f'''<div style="background-color: #f8f9fa; border: 1px solid #dee2e6; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <h4 style="margin: 0 0 10px 0; color: #495057;">📅 Original Booking (Changed From)</h4>
+                <table style="width: 100%; font-size: 14px;">
+                    <tr>
+                        <td style="padding: 4px 0; color: #6c757d;">Date:</td>
+                        <td style="padding: 4px 0; text-decoration: line-through;">{original_booking_data.get('date', 'N/A')}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 4px 0; color: #6c757d;">Time:</td>
+                        <td style="padding: 4px 0; text-decoration: line-through;">{original_booking_data.get('time', 'N/A')}</td>
+                    </tr>
+                </table>
+            </div>''' if original_booking_data else ''}
+            
+            {f'''<div style="background-color: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <h4 style="margin: 0 0 10px 0; color: #856404;">📝 Modification Reason</h4>
+                <p style="margin: 0; color: #856404;">{modification_reason}</p>
+            </div>''' if modification_reason else ''}
+            
+            <div style="background-color: #d1ecf1; border: 1px solid #bee5eb; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <h4 style="margin: 0 0 10px 0; color: #0c5460;">✅ What's Next</h4>
+                <ul style="margin: 0; padding-left: 20px; color: #0c5460;">
+                    <li>Your new booking time is confirmed and reserved</li>
+                    <li>Save this email as your booking confirmation</li>
+                    <li>Arrive 5 minutes early for check-in</li>
+                    <li>You'll receive reminder emails before your session</li>
+                </ul>
+            </div>
+            
+            <div style="background-color: #e9ecef; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <p style="margin: 0; font-size: 14px; color: #6c757d;">
+                    <strong>Location:</strong> City Discoverer<br>
+                    50 Stately St, Suite 2, Wiley Ford WV 26767
+                </p>
+            </div>
+            
+            <div style="text-align: center; margin: 20px 0;">
+                <a href="#" style="background-color: #28a745; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Add to Calendar</a>
+            </div>
+            
+            <div style="text-align: center; color: #6c757d; font-size: 12px; margin-top: 30px;">
+                <p>Questions about your modified booking? Reply to this email or contact us at hello@citydiscoverer.ai</p>
+            </div>
+        </body>
+        </html>
+        """
+        
+        # Send to customer
+        customer_message = Mail(
+            from_email=Email("billing@citydiscoverer.ai", "EasyDesk Booking System"),
+            to_emails=To(booking.email),
+            subject=subject,
+            html_content=Content("text/html", html_content)
+        )
+        customer_message.reply_to = Email("hello@citydiscoverer.ai")
+        
+        # Send to admin
+        admin_subject = f"[ADMIN] Booking Modified - {booking.resource.name}"
+        admin_message = Mail(
+            from_email=Email("billing@citydiscoverer.ai", "EasyDesk Booking System"),
+            to_emails=To("hello@citydiscoverer.ai"),
+            subject=admin_subject,
+            html_content=Content("text/html", html_content)
+        )
+        admin_message.reply_to = Email("hello@citydiscoverer.ai")
+        
+        # Send both emails
+        customer_response = sg.send(customer_message)
+        admin_response = sg.send(admin_message)
+        
+        print(f"Booking modification email sent! Customer: {customer_response.status_code}, Admin: {admin_response.status_code}")
+        return True
+        
+    except Exception as e:
+        print(f"Failed to send booking modification email: {str(e)}")
+        return False
+
 def user_has_used_promo(email: str, code: str) -> bool:
     return Booking.query.filter(
         Booking.email == email,
