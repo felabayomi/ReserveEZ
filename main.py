@@ -455,90 +455,74 @@ def book_page():
 
 @app.post("/book")
 def create_booking():
-    booking_type = request.form.get("booking_type", "hourly")
+    """Handle new plan-based booking system"""
     email = request.form["email"].strip().lower()
     name = request.form["name"]
-    
-    if booking_type == "pass":
-        return handle_pass_purchase(email, name)
-    else:
-        return handle_hourly_booking(email, name)
-
-def handle_hourly_booking(email, name):
-    """Handle hourly desk booking"""
     resource_id = int(request.form["resource_id"])
-    date = request.form["date"]
-    start = request.form["start_time"]
-    hours = float(request.form.get("hours", "1"))
+    plan_type = request.form["plan_type"]
+    seats = int(request.form.get("seats", 1))
     code = request.form.get("promo", "").strip().upper()
     payment_method = request.form.get("payment_method", "online")
-
-    res = Resource.query.get_or_404(resource_id)
-    start_dt = parse_dt(date, start)
-    end_dt = start_dt + dt.timedelta(hours=hours)
-    amount_cents = int(res.hourly_rate_cents * hours)
-
-    # Validate opening hours
-    if not is_in_hours(res, start_dt, end_dt):
-        flash("Booking time is outside opening hours.", "warning")
-        return redirect(url_for("book_page"))
-
-    # Check capacity
-    if seats_left(res.id, start_dt, end_dt) <= 0:
-        flash("No capacity available for this time slot.", "warning")
-        return redirect(url_for("book_page"))
-
-    # Check for overlap
-    overlap = Booking.query.filter(
-        Booking.resource_id == res.id,
-        Booking.status.in_(["reserved", "paid", "checked_in", "free"]),
-        Booking.start_dt < end_dt,
-        Booking.end_dt > start_dt
-    ).count()
     
-    if overlap >= res.capacity:
-        flash("Time slot is full. Please choose another time.", "warning")
-        return redirect(url_for("book_page"))
+    return handle_plan_booking(email, name, resource_id, plan_type, seats, code, payment_method)
 
-    # Check for active pass
+def handle_plan_booking(email, name, resource_id, plan_type, seats, code, payment_method):
+    """Handle plan-based booking (hour/day/week/month)"""
+    resource = Resource.query.get_or_404(resource_id)
+    
+    # Parse plan-specific date/time fields
+    start_dt, end_dt, hours = parse_plan_dates(plan_type, resource)
+    
+    # Validate availability
+    is_valid, error_msg = validate_booking_availability(
+        resource_id, plan_type, seats, start_dt, end_dt, hours
+    )
+    
+    if not is_valid:
+        flash(f"Booking unavailable: {error_msg}", "warning")
+        return redirect(url_for("book_page"))
+    
+    # Calculate pricing
+    amount_cents = calculate_plan_price(resource, plan_type, seats, hours)
+    
+    # Check for active pass (for future pass integration)
     user_pass = active_pass(email, start_dt)
     if user_pass:
-        # Free booking with active pass
-        booking = Booking()
-        booking.email = email
-        booking.name = name
-        booking.resource_id = res.id
-        booking.start_dt = start_dt
-        booking.end_dt = end_dt
-        booking.hours = hours
-        booking.amount_cents = 0
-        booking.status = "free"
-        db.session.add(booking)
-        db.session.commit()
-        return redirect(url_for("success_free", bid=booking.id))
-
-    # Promo: EASYWEEK = first booking free (per email)
-    apply_free = (code == PROMO_CODE) and not user_has_used_promo(email, PROMO_CODE)
+        amount_cents = 0
+        status = "free"
+    else:
+        # Check promo code
+        apply_free = (code == PROMO_CODE) and not user_has_used_promo(email, PROMO_CODE)
+        if apply_free:
+            amount_cents = 0
+            status = "free"
+        else:
+            status = "reserved"
     
+    # Create booking
     booking = Booking()
     booking.email = email
     booking.name = name
-    booking.resource_id = res.id
+    booking.resource_id = resource_id
+    booking.plan_type = plan_type
+    booking.seats = seats
     booking.start_dt = start_dt
     booking.end_dt = end_dt
-    booking.hours = hours
-    booking.amount_cents = 0 if apply_free else amount_cents
-    booking.status = "free" if apply_free else "reserved"
-    booking.promo_applied = PROMO_CODE if apply_free else None
+    booking.hours = hours if plan_type == "hour" else calculate_hours_from_range(start_dt, end_dt, resource)
+    booking.amount_cents = amount_cents
+    booking.status = status
+    booking.promo_applied = PROMO_CODE if (code == PROMO_CODE and amount_cents == 0) else None
+    
     db.session.add(booking)
     db.session.commit()
-
-    if apply_free:
+    
+    # Handle free bookings
+    if amount_cents == 0:
         return redirect(url_for("success_free", bid=booking.id))
-
-    # Handle payment
+    
+    # Handle payments
     if payment_method == "pos" and ALLOW_POS_CHECKOUT:
-        # Chase POS flow - create payment record
+        # Chase POS flow
         payment = Payment()
         payment.booking_id = booking.id
         payment.provider = "chase"
@@ -551,8 +535,8 @@ def handle_hourly_booking(email, name):
         # Mercury online payment
         if USE_MERCURY and amount_cents > 0:
             mercury_result = create_mercury_invoice(
-                amount_cents, email, 
-                f"{res.name} ({hours}h)",
+                amount_cents, email,
+                f"{resource.name} ({plan_type} - {seats} seats)",
                 {"type": "booking", "booking_id": booking.id}
             )
             
@@ -575,6 +559,92 @@ def handle_hourly_booking(email, name):
             booking.status = "confirmed"
             db.session.commit()
             return redirect(url_for("success_free", bid=booking.id))
+
+def parse_plan_dates(plan_type, resource):
+    """Parse form data to get start_dt, end_dt, and hours for different plan types"""
+    if plan_type == "hour":
+        # Hourly booking
+        booking_date = request.form.get("booking_date") or request.form.get("date")
+        start_time = request.form["start_time"]
+        end_time = request.form["end_time"]
+        
+        start_dt = parse_dt(booking_date, start_time)
+        end_dt = parse_dt(booking_date, end_time)
+        
+        # Calculate hours
+        hours = (end_dt - start_dt).total_seconds() / 3600
+        
+        return start_dt, end_dt, hours
+    
+    elif plan_type == "day":
+        # Day pass booking
+        booking_date = request.form.get("booking_date") or request.form.get("date")
+        
+        # Get opening hours for this day
+        hours_data = resource.get_opening_hours()
+        parsed_date = dt.datetime.strptime(booking_date, "%Y-%m-%d")
+        day_key = parsed_date.strftime("%a").lower()
+        
+        if day_key in hours_data and hours_data[day_key]:
+            open_time, close_time = hours_data[day_key][0]
+            start_dt = parse_dt(booking_date, open_time)
+            end_dt = parse_dt(booking_date, close_time)
+        else:
+            # Default hours if not configured
+            start_dt = parse_dt(booking_date, "09:00")
+            end_dt = parse_dt(booking_date, "17:00")
+        
+        return start_dt, end_dt, 8.0  # Standard 8-hour day
+    
+    elif plan_type in ["week", "month"]:
+        # Week/month pass booking
+        start_date = request.form.get("start_date") or request.form.get("date")
+        
+        start_dt = parse_dt(start_date, "09:00")  # Start at 9 AM
+        
+        if plan_type == "week":
+            end_dt = start_dt + dt.timedelta(days=7)
+        else:  # month
+            end_dt = start_dt + dt.timedelta(days=30)
+        
+        # Replace end time with closing time
+        end_dt = end_dt.replace(hour=17, minute=0, second=0, microsecond=0)
+        
+        return start_dt, end_dt, 168.0 if plan_type == "week" else 720.0  # Approximate hours
+    
+    else:
+        raise ValueError(f"Invalid plan type: {plan_type}")
+
+def calculate_hours_from_range(start_dt, end_dt, resource):
+    """Calculate effective booking hours within opening hours"""
+    hours_data = resource.get_opening_hours()
+    total_hours = 0
+    
+    current = start_dt.date()
+    end_date = end_dt.date()
+    
+    while current <= end_date:
+        day_key = current.strftime("%a").lower()
+        
+        if day_key in hours_data and hours_data[day_key]:
+            for window in hours_data[day_key]:
+                if len(window) == 2:
+                    open_time = dt.datetime.strptime(window[0], "%H:%M").time()
+                    close_time = dt.datetime.strptime(window[1], "%H:%M").time()
+                    
+                    day_open = dt.datetime.combine(current, open_time)
+                    day_close = dt.datetime.combine(current, close_time)
+                    
+                    # Calculate overlap with booking window
+                    effective_start = max(start_dt, day_open)
+                    effective_end = min(end_dt, day_close)
+                    
+                    if effective_start < effective_end:
+                        total_hours += (effective_end - effective_start).total_seconds() / 3600
+        
+        current += dt.timedelta(days=1)
+    
+    return total_hours
 
 def handle_pass_purchase(email, name):
     """Handle pass purchase"""

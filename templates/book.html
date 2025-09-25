@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
-<h2>Reserve your spot</h2>
+<h2>Reserve your workspace</h2>
 
 <!-- Date selection for availability -->
 <form method="get" action="/book" class="row g-3 mb-4">
@@ -13,125 +13,127 @@
   </div>
 </form>
 
-<!-- Availability grid -->
-<div class="card mb-4">
-  <div class="card-header">Availability — {{ date }}</div>
-  <div class="card-body">
-    <table class="table table-sm">
-      <tr><th>Resource</th><th>Capacity</th><th>Booked slots</th></tr>
-      {% for r in resources %}
-      <tr>
-        <td>
-          <strong>{{ r.name }}</strong>
-          <br><small class="text-muted">${{ "%.2f"|format(r.hourly_rate_cents/100) }}/hr</small>
-        </td>
-        <td>
-          {% set info = capacity_info.get(r.id, {'available': r.capacity, 'total': r.capacity}) %}
-          <span class="badge {{ 'bg-success' if info.available > 3 else 'bg-warning' if info.available > 0 else 'bg-danger' }}">
-            {{ info.available }}/{{ info.total }} available
-          </span>
-        </td>
-        <td>
-          {% if grouped.get(r.id) %}
-            {% for b in grouped.get(r.id) %}
-              <span class="badge text-bg-secondary me-1">
-                {{ b.start_dt.strftime("%I:%M %p") }}–{{ b.end_dt.strftime("%I:%M %p") }}
-                ({{ b.status }})
-              </span>
-            {% endfor %}
-          {% else %}
-            <span class="text-success">All day open</span>
-          {% endif %}
-        </td>
-      </tr>
-      {% endfor %}
-    </table>
+<!-- Resource cards with capacity badges -->
+<div class="row g-4 mb-4">
+  {% for r in resources %}
+  <div class="col-md-6 col-lg-3">
+    <div class="card h-100 resource-card" data-resource-id="{{ r.id }}" onclick="selectResource({{ r.id }}, '{{ r.name }}')">
+      <div class="card-body text-center">
+        <h5 class="card-title">{{ r.name }}</h5>
+        {% set info = capacity_info.get(r.id, {'available': r.capacity, 'total': r.capacity}) %}
+        <span class="badge mb-2 {{ 'bg-success' if info.available > 2 else 'bg-warning' if info.available > 0 else 'bg-danger' }}">
+          {{ info.available }}/{{ info.total }} available
+        </span>
+        <div class="pricing-preview">
+          <small class="text-muted d-block">Starting at</small>
+          <strong>${{ "%.0f"|format(r.hourly_rate_cents/100) }}/hour</strong>
+        </div>
+        <button class="btn btn-primary btn-sm mt-2">
+          Book {{ r.name }}
+        </button>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Step 1: Resource Selection Modal -->
+<div class="modal fade" id="resourceModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Step 1: Choose your workspace</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-3">
+          {% for r in resources %}
+          <div class="col-12">
+            <div class="card resource-option" data-resource-id="{{ r.id }}" onclick="selectResourceStep1({{ r.id }}, '{{ r.name }}')">
+              <div class="card-body">
+                <div class="row align-items-center">
+                  <div class="col-8">
+                    <h6 class="mb-1">{{ r.name }}</h6>
+                    <small class="text-muted">Capacity: {{ r.capacity }}</small>
+                  </div>
+                  <div class="col-4 text-end">
+                    {% set info = capacity_info.get(r.id, {'available': r.capacity, 'total': r.capacity}) %}
+                    <span class="badge {{ 'bg-success' if info.available > 2 else 'bg-warning' if info.available > 0 else 'bg-danger' }}">
+                      {{ info.available }}/{{ info.total }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
-<!-- Booking form -->
-<div class="row">
-  <div class="col-lg-8">
-    <div class="card">
-      <div class="card-header">Make a reservation</div>
-      <div class="card-body">
-        <form method="post" action="/book" class="row g-3">
+<!-- Step 2: Plan Selection Modal -->
+<div class="modal fade" id="planModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Step 2: How long do you need the space?</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted">Selected: <strong id="selected-resource-name"></strong></p>
+        <div class="row g-3" id="plan-options">
+          <!-- Plan options will be populated by JavaScript -->
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Step 3: Booking Details Modal -->
+<div class="modal fade" id="detailsModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Step 3: Booking details</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="booking-form" method="post" action="/book">
+          <input type="hidden" name="resource_id" id="form-resource-id">
+          <input type="hidden" name="plan_type" id="form-plan-type">
           <input type="hidden" name="date" value="{{ date }}">
           
           <!-- Personal info -->
-          <div class="col-md-6">
-            <label class="form-label">Name</label>
-            <input required name="name" class="form-control" id="user-name">
-          </div>
-          <div class="col-md-6">
-            <label class="form-label">Email</label>
-            <input required name="email" type="email" class="form-control" id="user-email" oninput="checkActivePass()">
-          </div>
-          
-          <!-- Active pass notification -->
-          <div class="col-12" id="pass-notification" style="display: none;">
-            <div class="alert alert-success">
-              <strong>🎉 Pass active!</strong> You have an active pass until <span id="pass-expiry"></span> — this booking will be free.
-            </div>
-          </div>
-          
-          <!-- Booking type selection -->
-          <div class="col-12">
-            <div class="form-check">
-              <input class="form-check-input" type="radio" name="booking_type" id="booking-hourly" value="hourly" checked onchange="toggleBookingType()">
-              <label class="form-check-label" for="booking-hourly">
-                <strong>Book by the hour</strong> — Pay for specific time slots
-              </label>
-            </div>
-            <div class="form-check">
-              <input class="form-check-input" type="radio" name="booking_type" id="booking-pass" value="pass" onchange="toggleBookingType()">
-              <label class="form-check-label" for="booking-pass">
-                <strong>Buy a pass</strong> — Unlimited bookings during validity period
-              </label>
-            </div>
-          </div>
-          
-          <!-- Hourly booking options -->
-          <div id="hourly-options">
+          <div class="row g-3 mb-4">
             <div class="col-md-6">
-              <label class="form-label">Resource</label>
-              <select name="resource_id" class="form-select">
-                {% for r in resources %}
-                <option value="{{ r.id }}">{{ r.name }} — ${{ "%.2f"|format(r.hourly_rate_cents/100) }}/hr</option>
-                {% endfor %}
-              </select>
+              <label class="form-label">Name *</label>
+              <input required name="name" class="form-control">
             </div>
-            
-            <div class="col-md-3">
-              <label class="form-label">Start time</label>
-              <input required type="time" name="start_time" value="09:00" class="form-control">
-            </div>
-            <div class="col-md-3">
-              <label class="form-label">Hours</label>
-              <input required type="number" name="hours" value="1" min="0.5" step="0.5" class="form-control">
-            </div>
-            
             <div class="col-md-6">
-              <label class="form-label">Promo code</label>
-              <input name="promo" placeholder="{{ promo }}" class="form-control">
-              <div class="form-text">Use {{ promo }} for a free first booking.</div>
+              <label class="form-label">Email *</label>
+              <input required name="email" type="email" class="form-control">
             </div>
           </div>
-          
-          <!-- Pass options -->
-          <div id="pass-options" style="display: none;">
-            <div class="col-md-6">
-              <label class="form-label">Pass type</label>
-              <select name="pass_type" class="form-select">
-                <option value="day">Day Pass — $10 (unlimited same-day bookings)</option>
-                <option value="week">Weekly Pass — $30 (7 days from purchase)</option>
-                <option value="month">Monthly Pass — $120 (30 days from purchase)</option>
-              </select>
+
+          <!-- Plan-specific fields -->
+          <div id="plan-specific-fields">
+            <!-- Fields populated by JavaScript based on plan type -->
+          </div>
+
+          <!-- Booking summary -->
+          <div class="card bg-light mb-4">
+            <div class="card-body">
+              <h6>Booking Summary</h6>
+              <div id="booking-summary">
+                <!-- Summary populated by JavaScript -->
+              </div>
             </div>
           </div>
-          
+
           <!-- Payment method -->
-          <div class="col-12">
+          <div class="mb-4">
             <label class="form-label">Payment method</label>
             <div class="form-check">
               <input class="form-check-input" type="radio" name="payment_method" id="payment-online" value="online" checked>
@@ -143,61 +145,337 @@
             <div class="form-check">
               <input class="form-check-input" type="radio" name="payment_method" id="payment-pos" value="pos">
               <label class="form-check-label" for="payment-pos">
-                Pay at desk (Chase POS) — We'll confirm and email receipt
+                Pay at desk (Chase POS)
               </label>
             </div>
             {% endif %}
           </div>
-          
-          <div class="col-12">
-            <button class="btn btn-primary btn-lg" type="submit">Proceed</button>
-            <a class="btn btn-outline-secondary" href="/">Cancel</a>
+
+          <!-- Promo code -->
+          <div class="mb-4">
+            <label class="form-label">Promo code</label>
+            <input name="promo" placeholder="{{ promo }}" class="form-control">
+            <div class="form-text">Use {{ promo }} for a free first booking.</div>
           </div>
         </form>
       </div>
-    </div>
-  </div>
-  
-  <div class="col-lg-4">
-    <div class="card">
-      <div class="card-header">Quick info</div>
-      <div class="card-body">
-        <h6>Opening Hours</h6>
-        <ul class="list-unstyled small">
-          <li><strong>Mon–Fri:</strong> 9:00 AM – 6:00 PM</li>
-          <li><strong>Saturday:</strong> 10:00 AM – 2:00 PM</li>
-          <li><strong>Sunday:</strong> Closed</li>
-        </ul>
-        
-        <h6>Pass Benefits</h6>
-        <ul class="list-unstyled small">
-          <li>✓ Unlimited bookings during validity</li>
-          <li>✓ Subject to capacity availability</li>
-          <li>✓ No hourly charges</li>
-          <li>✓ Easy online management</li>
-        </ul>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="goToPlanSelection()">← Back</button>
+        <button type="button" class="btn btn-primary" onclick="submitBooking()">Complete Booking</button>
       </div>
     </div>
   </div>
 </div>
 
+<!-- Available time slots display -->
+<div class="card">
+  <div class="card-header">Current bookings — {{ date }}</div>
+  <div class="card-body">
+    {% if grouped %}
+      <div class="row">
+        {% for resource_id, bookings in grouped.items() %}
+          {% set resource = resources|selectattr("id", "equalto", resource_id)|first %}
+          <div class="col-md-6 mb-3">
+            <h6>{{ resource.name if resource else 'Resource ' + resource_id|string }}</h6>
+            {% for b in bookings %}
+              <span class="badge text-bg-secondary me-1 mb-1">
+                {{ b.start_dt.strftime("%I:%M %p") }}–{{ b.end_dt.strftime("%I:%M %p") }}
+                {% if b.plan_type != 'hour' %}({{ b.plan_type }} pass){% endif %}
+              </span>
+            {% endfor %}
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="text-success mb-0">All resources are available all day!</p>
+    {% endif %}
+  </div>
+</div>
+
 <script>
-function toggleBookingType() {
-  const isHourly = document.getElementById('booking-hourly').checked;
-  document.getElementById('hourly-options').style.display = isHourly ? 'contents' : 'none';
-  document.getElementById('pass-options').style.display = isHourly ? 'none' : 'contents';
+// Resource data for JavaScript
+const resources = {{ resources|map(attribute='__dict__')|list|tojson }};
+const resourcesData = {};
+resources.forEach(r => {
+  resourcesData[r.id] = r;
+});
+
+let selectedResource = null;
+let selectedPlan = null;
+
+function selectResource(resourceId, resourceName) {
+  selectedResource = resourceId;
+  document.getElementById('selected-resource-name').textContent = resourceName;
+  showPlanSelection();
 }
 
-function checkActivePass() {
-  // This would normally make an API call to check for active passes
-  // For now, it's a placeholder
-  const email = document.getElementById('user-email').value;
-  if (email && email.includes('@')) {
-    // Mock check - in real implementation, this would be an AJAX call
-    // document.getElementById('pass-notification').style.display = 'block';
-    // document.getElementById('pass-expiry').textContent = 'Sep 30, 2025';
-  }
+function selectResourceStep1(resourceId, resourceName) {
+  selectedResource = resourceId;
+  document.getElementById('selected-resource-name').textContent = resourceName;
+  
+  // Close resource modal and show plan modal
+  const resourceModal = bootstrap.Modal.getInstance(document.getElementById('resourceModal'));
+  resourceModal.hide();
+  
+  setTimeout(() => {
+    showPlanSelection();
+  }, 300);
 }
+
+function showPlanSelection() {
+  if (!selectedResource) return;
+  
+  const resource = resourcesData[selectedResource];
+  const planOptions = document.getElementById('plan-options');
+  
+  planOptions.innerHTML = `
+    <div class="col-12">
+      <div class="card plan-option" onclick="selectPlan('hour')">
+        <div class="card-body">
+          <div class="row align-items-center">
+            <div class="col-8">
+              <h6 class="mb-1">Hourly</h6>
+              <small class="text-muted">Pay for specific time slots</small>
+            </div>
+            <div class="col-4 text-end">
+              <strong>$${(resource.hourly_rate_cents/100).toFixed(0)}/hr</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-12">
+      <div class="card plan-option" onclick="selectPlan('day')">
+        <div class="card-body">
+          <div class="row align-items-center">
+            <div class="col-8">
+              <h6 class="mb-1">Day Pass</h6>
+              <small class="text-muted">Full day access within business hours</small>
+            </div>
+            <div class="col-4 text-end">
+              <strong>$${(resource.day_rate_cents/100).toFixed(0)}</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-12">
+      <div class="card plan-option" onclick="selectPlan('week')">
+        <div class="card-body">
+          <div class="row align-items-center">
+            <div class="col-8">
+              <h6 class="mb-1">Week Pass</h6>
+              <small class="text-muted">7 consecutive days of access</small>
+            </div>
+            <div class="col-4 text-end">
+              <strong>$${(resource.week_rate_cents/100).toFixed(0)}</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-12">
+      <div class="card plan-option" onclick="selectPlan('month')">
+        <div class="card-body">
+          <div class="row align-items-center">
+            <div class="col-8">
+              <h6 class="mb-1">Month Pass</h6>
+              <small class="text-muted">30 consecutive days of access</small>
+            </div>
+            <div class="col-4 text-end">
+              <strong>$${(resource.month_rate_cents/100).toFixed(0)}</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  const planModal = new bootstrap.Modal(document.getElementById('planModal'));
+  planModal.show();
+}
+
+function selectPlan(planType) {
+  selectedPlan = planType;
+  
+  // Close plan modal and show details modal
+  const planModal = bootstrap.Modal.getInstance(document.getElementById('planModal'));
+  planModal.hide();
+  
+  setTimeout(() => {
+    showBookingDetails();
+  }, 300);
+}
+
+function showBookingDetails() {
+  if (!selectedResource || !selectedPlan) return;
+  
+  const resource = resourcesData[selectedResource];
+  
+  // Set hidden form fields
+  document.getElementById('form-resource-id').value = selectedResource;
+  document.getElementById('form-plan-type').value = selectedPlan;
+  
+  // Generate plan-specific fields
+  const fieldsContainer = document.getElementById('plan-specific-fields');
+  let fieldsHTML = '';
+  
+  if (selectedPlan === 'hour') {
+    fieldsHTML = `
+      <div class="row g-3 mb-4">
+        <div class="col-md-4">
+          <label class="form-label">Date</label>
+          <input type="date" name="booking_date" value="{{ date }}" class="form-control" readonly>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Start time *</label>
+          <input required type="time" name="start_time" value="09:00" class="form-control" onchange="updateSummary()">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">End time *</label>
+          <input required type="time" name="end_time" value="10:00" class="form-control" onchange="updateSummary()">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Seats *</label>
+          <input required type="number" name="seats" value="1" min="1" max="${resource.capacity}" class="form-control" onchange="updateSummary()">
+          <div class="form-text">Max ${resource.capacity} seats available</div>
+        </div>
+      </div>
+    `;
+  } else if (selectedPlan === 'day') {
+    fieldsHTML = `
+      <div class="row g-3 mb-4">
+        <div class="col-md-6">
+          <label class="form-label">Date *</label>
+          <input required type="date" name="booking_date" value="{{ date }}" class="form-control" onchange="updateSummary()">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Seats *</label>
+          <input required type="number" name="seats" value="1" min="1" max="${resource.capacity}" class="form-control" onchange="updateSummary()">
+          <div class="form-text">Max ${resource.capacity} seats available</div>
+        </div>
+      </div>
+    `;
+  } else if (selectedPlan === 'week') {
+    fieldsHTML = `
+      <div class="row g-3 mb-4">
+        <div class="col-md-6">
+          <label class="form-label">Start date *</label>
+          <input required type="date" name="start_date" value="{{ date }}" class="form-control" onchange="updateSummary()">
+          <div class="form-text">7 consecutive days starting from this date</div>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Seats *</label>
+          <input required type="number" name="seats" value="1" min="1" max="${resource.capacity}" class="form-control" onchange="updateSummary()">
+          <div class="form-text">Max ${resource.capacity} seats available</div>
+        </div>
+      </div>
+    `;
+  } else if (selectedPlan === 'month') {
+    fieldsHTML = `
+      <div class="row g-3 mb-4">
+        <div class="col-md-6">
+          <label class="form-label">Start date *</label>
+          <input required type="date" name="start_date" value="{{ date }}" class="form-control" onchange="updateSummary()">
+          <div class="form-text">30 consecutive days starting from this date</div>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Seats *</label>
+          <input required type="number" name="seats" value="1" min="1" max="${resource.capacity}" class="form-control" onchange="updateSummary()">
+          <div class="form-text">Max ${resource.capacity} seats available</div>
+        </div>
+      </div>
+    `;
+  }
+  
+  fieldsContainer.innerHTML = fieldsHTML;
+  updateSummary();
+  
+  const detailsModal = new bootstrap.Modal(document.getElementById('detailsModal'));
+  detailsModal.show();
+}
+
+function updateSummary() {
+  if (!selectedResource || !selectedPlan) return;
+  
+  const resource = resourcesData[selectedResource];
+  const summaryContainer = document.getElementById('booking-summary');
+  const seats = parseInt(document.querySelector('[name="seats"]')?.value || 1);
+  
+  let summaryHTML = `
+    <div class="row">
+      <div class="col-6"><strong>Resource:</strong></div>
+      <div class="col-6">${resource.name}</div>
+      <div class="col-6"><strong>Plan:</strong></div>
+      <div class="col-6">${selectedPlan.charAt(0).toUpperCase() + selectedPlan.slice(1)}</div>
+      <div class="col-6"><strong>Seats:</strong></div>
+      <div class="col-6">${seats}</div>
+  `;
+  
+  let totalPrice = 0;
+  
+  if (selectedPlan === 'hour') {
+    const startTime = document.querySelector('[name="start_time"]')?.value;
+    const endTime = document.querySelector('[name="end_time"]')?.value;
+    if (startTime && endTime) {
+      const start = new Date('2000-01-01 ' + startTime);
+      const end = new Date('2000-01-01 ' + endTime);
+      const hours = (end - start) / (1000 * 60 * 60);
+      totalPrice = resource.hourly_rate_cents * hours * seats;
+      summaryHTML += `
+        <div class="col-6"><strong>Duration:</strong></div>
+        <div class="col-6">${hours} hours</div>
+      `;
+    }
+  } else if (selectedPlan === 'day') {
+    totalPrice = resource.day_rate_cents * seats;
+  } else if (selectedPlan === 'week') {
+    totalPrice = resource.week_rate_cents * seats;
+  } else if (selectedPlan === 'month') {
+    totalPrice = resource.month_rate_cents * seats;
+  }
+  
+  summaryHTML += `
+      <div class="col-6"><strong>Total:</strong></div>
+      <div class="col-6"><strong>$${(totalPrice/100).toFixed(2)}</strong></div>
+    </div>
+  `;
+  
+  summaryContainer.innerHTML = summaryHTML;
+}
+
+function goToPlanSelection() {
+  const detailsModal = bootstrap.Modal.getInstance(document.getElementById('detailsModal'));
+  detailsModal.hide();
+  
+  setTimeout(() => {
+    showPlanSelection();
+  }, 300);
+}
+
+function submitBooking() {
+  document.getElementById('booking-form').submit();
+}
+
+// Add click-to-select styling
+document.addEventListener('DOMContentLoaded', function() {
+  const style = document.createElement('style');
+  style.textContent = `
+    .resource-card, .resource-option, .plan-option {
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .resource-card:hover, .resource-option:hover, .plan-option:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    .resource-option.selected, .plan-option.selected {
+      border-color: #0d6efd;
+      background-color: #f8f9ff;
+    }
+  `;
+  document.head.appendChild(style);
+});
 </script>
 
 {% endblock %}
