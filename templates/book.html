@@ -21,16 +21,15 @@
 </p>
 
 <!-- Date selection for availability -->
-<form method="get" action="/book" class="row g-3 mb-4">
-  <input type="hidden" name="plan" value="{{ pre_selected_plan }}">
+<div class="row g-3 mb-4">
   <div class="col-auto">
     <label class="form-label">See availability for:</label>
-    <input type="date" name="date" value="{{ date }}" class="form-control">
+    <input type="date" id="selected-date" value="{{ date }}" class="form-control">
   </div>
   <div class="col-auto align-self-end">
-    <button class="btn btn-outline-secondary">Show availability</button>
+    <button class="btn btn-outline-secondary" onclick="showAvailabilityCalendar()">Show availability</button>
   </div>
-</form>
+</div>
 
 <!-- Resource selection for pre-selected plan -->
 <div class="row g-4 mb-4">
@@ -293,6 +292,78 @@
   </div>
 </div>
 
+<!-- Availability Calendar Modal -->
+<div class="modal fade" id="availabilityModal" tabindex="-1">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">📅 Availability Calendar</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row mb-4">
+          <div class="col-md-8">
+            <div class="calendar-controls d-flex align-items-center gap-3 mb-3">
+              <button class="btn btn-outline-secondary btn-sm" onclick="previousMonth()">‹ Previous</button>
+              <h4 id="calendar-month-year" class="mb-0"></h4>
+              <button class="btn btn-outline-secondary btn-sm" onclick="nextMonth()">Next ›</button>
+            </div>
+            <div id="calendar-grid" class="calendar-container">
+              <!-- Calendar will be generated here -->
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="card">
+              <div class="card-header">
+                <h6 class="mb-0">📊 Legend</h6>
+              </div>
+              <div class="card-body">
+                <div class="legend-items">
+                  <div class="legend-item">
+                    <span class="legend-color" style="background: #e3f2fd; border: 2px solid #03a9f4;"></span>
+                    <span>Hourly bookings</span>
+                  </div>
+                  <div class="legend-item">
+                    <span class="legend-color" style="background: #e8f5e8; border: 2px solid #4caf50;"></span>
+                    <span>Day passes</span>
+                  </div>
+                  <div class="legend-item">
+                    <span class="legend-color" style="background: #fff3e0; border: 2px solid #ff9800;"></span>
+                    <span>Week passes</span>
+                  </div>
+                  <div class="legend-item">
+                    <span class="legend-color" style="background: #f3e5f5; border: 2px solid #9c27b0;"></span>
+                    <span>Month passes</span>
+                  </div>
+                  <div class="legend-item">
+                    <span class="legend-color" style="background: #f8f9fa; border: 2px solid #dee2e6;"></span>
+                    <span>Available</span>
+                  </div>
+                  <div class="legend-item">
+                    <span class="legend-color" style="background: #ffebee; border: 2px solid #f44336;"></span>
+                    <span>Fully booked</span>
+                  </div>
+                </div>
+                
+                <hr>
+                
+                <div id="selected-date-info">
+                  <h6>Selected Date</h6>
+                  <p class="text-muted small">Click on any date to see detailed availability</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary" onclick="selectDateAndClose()">Select Date</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 {% if not pre_selected_plan %}
 <!-- Original Modal Flow (only shown when no plan is pre-selected) -->
 <!-- Step 1: Resource Selection Modal -->
@@ -372,6 +443,191 @@ resources.forEach(r => {
 
 let selectedResource = null;
 let selectedPlan = '{{ pre_selected_plan }}' || null;
+let currentCalendarDate = new Date();
+let selectedCalendarDate = new Date('{{ date }}');
+
+// Calendar functionality
+function showAvailabilityCalendar() {
+  const modal = new bootstrap.Modal(document.getElementById('availabilityModal'));
+  generateCalendar();
+  modal.show();
+}
+
+function generateCalendar() {
+  const year = currentCalendarDate.getFullYear();
+  const month = currentCalendarDate.getMonth();
+  
+  // Update month/year display
+  const monthNames = ["January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"];
+  document.getElementById('calendar-month-year').textContent = `${monthNames[month]} ${year}`;
+  
+  // Generate calendar grid
+  const calendarGrid = document.getElementById('calendar-grid');
+  calendarGrid.innerHTML = generateCalendarHTML(year, month);
+  
+  // Fetch and apply availability data
+  fetchAvailabilityData(year, month);
+}
+
+function generateCalendarHTML(year, month) {
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  const startingDayOfWeek = firstDay.getDay();
+  const daysInMonth = lastDay.getDate();
+  
+  let html = `
+    <div class="calendar-grid">
+      <div class="calendar-header">
+        <div class="day-header">Sun</div>
+        <div class="day-header">Mon</div>
+        <div class="day-header">Tue</div>
+        <div class="day-header">Wed</div>
+        <div class="day-header">Thu</div>
+        <div class="day-header">Fri</div>
+        <div class="day-header">Sat</div>
+      </div>
+      <div class="calendar-body">
+  `;
+  
+  // Add empty cells for days before month starts
+  for (let i = 0; i < startingDayOfWeek; i++) {
+    html += '<div class="calendar-day empty"></div>';
+  }
+  
+  // Add days of the month
+  for (let day = 1; day <= daysInMonth; day++) {
+    const currentDate = new Date(year, month, day);
+    const isToday = isDateToday(currentDate);
+    const isSelected = isDateSelected(currentDate);
+    const isPast = currentDate < new Date().setHours(0,0,0,0);
+    
+    html += `
+      <div class="calendar-day ${isToday ? 'today' : ''} ${isSelected ? 'selected' : ''} ${isPast ? 'past' : ''}" 
+           data-date="${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}"
+           onclick="selectCalendarDate('${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}')">
+        <div class="day-number">${day}</div>
+        <div class="day-bookings" id="bookings-${year}-${month + 1}-${day}">
+          <!-- Booking indicators will be added here -->
+        </div>
+      </div>
+    `;
+  }
+  
+  html += '</div></div>';
+  return html;
+}
+
+function isDateToday(date) {
+  const today = new Date();
+  return date.toDateString() === today.toDateString();
+}
+
+function isDateSelected(date) {
+  return date.toDateString() === selectedCalendarDate.toDateString();
+}
+
+async function fetchAvailabilityData(year, month) {
+  // Mock availability data - in real app, this would be an API call
+  const mockBookings = [
+    { date: '2025-09-26', type: 'hour', resource: 'Hot Desk', count: 2 },
+    { date: '2025-09-27', type: 'day', resource: 'Meeting Lounge', count: 1 },
+    { date: '2025-09-28', type: 'week', resource: 'Quiet Desk', count: 1 },
+    { date: '2025-09-30', type: 'month', resource: 'Whole Room', count: 1 },
+    { date: '2025-10-01', type: 'hour', resource: 'Hot Desk', count: 3 },
+    { date: '2025-10-02', type: 'day', resource: 'Hot Desk', count: 2 },
+  ];
+  
+  // Apply booking data to calendar
+  mockBookings.forEach(booking => {
+    const [bookingYear, bookingMonth, bookingDay] = booking.date.split('-').map(Number);
+    if (bookingYear === year && bookingMonth === month + 1) {
+      addBookingToCalendar(bookingDay, booking);
+    }
+  });
+}
+
+function addBookingToCalendar(day, booking) {
+  const bookingsContainer = document.getElementById(`bookings-${currentCalendarDate.getFullYear()}-${currentCalendarDate.getMonth() + 1}-${day}`);
+  if (bookingsContainer) {
+    const indicator = document.createElement('div');
+    indicator.className = `booking-indicator booking-${booking.type}`;
+    indicator.title = `${booking.type} booking - ${booking.resource}`;
+    bookingsContainer.appendChild(indicator);
+    
+    // Add color coding to the day cell
+    const dayCell = bookingsContainer.closest('.calendar-day');
+    if (dayCell) {
+      dayCell.classList.add(`has-${booking.type}`);
+    }
+  }
+}
+
+function selectCalendarDate(dateString) {
+  // Remove previous selection
+  document.querySelectorAll('.calendar-day.selected').forEach(day => {
+    day.classList.remove('selected');
+  });
+  
+  // Add selection to clicked date
+  const clickedDay = document.querySelector(`[data-date="${dateString}"]`);
+  if (clickedDay) {
+    clickedDay.classList.add('selected');
+    selectedCalendarDate = new Date(dateString);
+    
+    // Update selected date info
+    updateSelectedDateInfo(dateString);
+  }
+}
+
+function updateSelectedDateInfo(dateString) {
+  const info = document.getElementById('selected-date-info');
+  const date = new Date(dateString);
+  const formattedDate = date.toLocaleDateString('en-US', { 
+    weekday: 'long', 
+    year: 'numeric', 
+    month: 'long', 
+    day: 'numeric' 
+  });
+  
+  info.innerHTML = `
+    <h6>Selected Date</h6>
+    <p class="mb-2"><strong>${formattedDate}</strong></p>
+    <div class="availability-summary">
+      <small class="text-muted">Availability for selected resources...</small>
+    </div>
+  `;
+}
+
+function previousMonth() {
+  currentCalendarDate.setMonth(currentCalendarDate.getMonth() - 1);
+  generateCalendar();
+}
+
+function nextMonth() {
+  currentCalendarDate.setMonth(currentCalendarDate.getMonth() + 1);
+  generateCalendar();
+}
+
+function selectDateAndClose() {
+  // Update the date input field
+  const dateInput = document.getElementById('selected-date');
+  if (dateInput) {
+    dateInput.value = selectedCalendarDate.toISOString().split('T')[0];
+  }
+  
+  // Close modal
+  const modal = bootstrap.Modal.getInstance(document.getElementById('availabilityModal'));
+  modal.hide();
+  
+  // Refresh the page with new date and selected plan
+  const currentPlan = '{{ pre_selected_plan }}';
+  if (currentPlan) {
+    window.location.href = `/book?plan=${currentPlan}&date=${selectedCalendarDate.toISOString().split('T')[0]}`;
+  } else {
+    window.location.href = `/book?date=${selectedCalendarDate.toISOString().split('T')[0]}`;
+  }
+}
 
 // Function to change plan (for change plan modal)
 function changePlan(planType) {
@@ -636,7 +892,7 @@ function submitBooking() {
   document.getElementById('booking-form').submit();
 }
 
-// Add click-to-select styling
+// Add styling for interactive elements and calendar
 document.addEventListener('DOMContentLoaded', function() {
   const style = document.createElement('style');
   style.textContent = `
@@ -651,6 +907,189 @@ document.addEventListener('DOMContentLoaded', function() {
     .resource-option.selected, .plan-option.selected {
       border-color: #0d6efd;
       background-color: #f8f9ff;
+    }
+    
+    /* Calendar Styles */
+    .calendar-container {
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    }
+    
+    .calendar-grid {
+      display: flex;
+      flex-direction: column;
+      background: white;
+    }
+    
+    .calendar-header {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+    
+    .day-header {
+      padding: 15px 8px;
+      text-align: center;
+      font-weight: 600;
+      font-size: 0.9rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    
+    .calendar-body {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 1px;
+      background: #e9ecef;
+    }
+    
+    .calendar-day {
+      background: white;
+      min-height: 80px;
+      padding: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .calendar-day:hover {
+      background: #f8f9fa;
+      transform: scale(1.02);
+      z-index: 2;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    
+    .calendar-day.empty {
+      background: #f8f9fa;
+      cursor: default;
+      opacity: 0.3;
+    }
+    
+    .calendar-day.empty:hover {
+      transform: none;
+      box-shadow: none;
+    }
+    
+    .calendar-day.past {
+      background: #f8f9fa;
+      color: #6c757d;
+      cursor: not-allowed;
+    }
+    
+    .calendar-day.past:hover {
+      transform: none;
+      box-shadow: none;
+    }
+    
+    .calendar-day.today {
+      background: linear-gradient(135deg, #ffeaa7 0%, #fab1a0 100%);
+      font-weight: bold;
+    }
+    
+    .calendar-day.selected {
+      background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%);
+      color: white;
+      font-weight: bold;
+    }
+    
+    .day-number {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    
+    .day-bookings {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 2px;
+      flex: 1;
+      align-items: flex-start;
+    }
+    
+    .booking-indicator {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      border: 1px solid rgba(255,255,255,0.8);
+    }
+    
+    /* Color coding for different booking types */
+    .calendar-day.has-hour {
+      border-left: 4px solid #03a9f4;
+    }
+    
+    .calendar-day.has-day {
+      border-left: 4px solid #4caf50;
+    }
+    
+    .calendar-day.has-week {
+      border-left: 4px solid #ff9800;
+    }
+    
+    .calendar-day.has-month {
+      border-left: 4px solid #9c27b0;
+    }
+    
+    .booking-hour {
+      background: #03a9f4;
+    }
+    
+    .booking-day {
+      background: #4caf50;
+    }
+    
+    .booking-week {
+      background: #ff9800;
+    }
+    
+    .booking-month {
+      background: #9c27b0;
+    }
+    
+    /* Legend Styles */
+    .legend-items {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .legend-color {
+      width: 20px;
+      height: 20px;
+      border-radius: 4px;
+      flex-shrink: 0;
+    }
+    
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+      .calendar-day {
+        min-height: 60px;
+        padding: 4px;
+      }
+      
+      .day-header {
+        padding: 10px 4px;
+        font-size: 0.8rem;
+      }
+      
+      .day-number {
+        font-size: 1rem;
+      }
+      
+      .modal-dialog.modal-xl {
+        max-width: 95%;
+        margin: 10px auto;
+      }
     }
   `;
   document.head.appendChild(style);
