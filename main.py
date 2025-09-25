@@ -2035,6 +2035,10 @@ def index():
 def about():
     return render_template("about.html")
 
+@app.get("/policies")
+def policies():
+    return render_template("policies.html")
+
 @app.get("/book")
 def book_page():
     resources = Resource.query.filter_by(active=True).all()
