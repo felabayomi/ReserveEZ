@@ -320,28 +320,16 @@
               <div class="card-body">
                 <div class="legend-items">
                   <div class="legend-item">
-                    <span class="legend-color" style="background: #e3f2fd; border: 2px solid #03a9f4;"></span>
-                    <span>Hourly bookings</span>
-                  </div>
-                  <div class="legend-item">
-                    <span class="legend-color" style="background: #e8f5e8; border: 2px solid #4caf50;"></span>
-                    <span>Day passes</span>
-                  </div>
-                  <div class="legend-item">
-                    <span class="legend-color" style="background: #fff3e0; border: 2px solid #ff9800;"></span>
-                    <span>Week passes</span>
-                  </div>
-                  <div class="legend-item">
-                    <span class="legend-color" style="background: #f3e5f5; border: 2px solid #9c27b0;"></span>
-                    <span>Month passes</span>
-                  </div>
-                  <div class="legend-item">
-                    <span class="legend-color" style="background: #f8f9fa; border: 2px solid #dee2e6;"></span>
+                    <span class="legend-color" style="background: #d4edda; border: 2px solid #28a745;"></span>
                     <span>Available</span>
                   </div>
                   <div class="legend-item">
-                    <span class="legend-color" style="background: #ffebee; border: 2px solid #f44336;"></span>
-                    <span>Fully booked</span>
+                    <span class="legend-color" style="background: #fff3cd; border: 2px solid #ffc107;"></span>
+                    <span>Limited</span>
+                  </div>
+                  <div class="legend-item">
+                    <span class="legend-color" style="background: #f8d7da; border: 2px solid #dc3545;"></span>
+                    <span>Fully Booked</span>
                   </div>
                 </div>
                 
@@ -349,7 +337,10 @@
                 
                 <div id="selected-date-info">
                   <h6>Selected Date</h6>
-                  <p class="text-muted small">Click on any date to see detailed availability</p>
+                  <p class="text-muted small">Click on any date to see what you can book</p>
+                  <div id="date-availability-details" style="display: none;">
+                    <!-- Detailed availability will appear here -->
+                  </div>
                 </div>
               </div>
             </div>
@@ -529,36 +520,47 @@ function isDateSelected(date) {
 
 async function fetchAvailabilityData(year, month) {
   // Mock availability data - in real app, this would be an API call
-  const mockBookings = [
-    { date: '2025-09-26', type: 'hour', resource: 'Hot Desk', count: 2 },
-    { date: '2025-09-27', type: 'day', resource: 'Meeting Lounge', count: 1 },
-    { date: '2025-09-28', type: 'week', resource: 'Quiet Desk', count: 1 },
-    { date: '2025-09-30', type: 'month', resource: 'Whole Room', count: 1 },
-    { date: '2025-10-01', type: 'hour', resource: 'Hot Desk', count: 3 },
-    { date: '2025-10-02', type: 'day', resource: 'Hot Desk', count: 2 },
-  ];
+  const mockAvailability = {
+    '2025-09-26': { status: 'available', details: { 'Hot Desk': { hour: true, day: true, week: false, month: false }, 'Quiet Desk': { hour: true, day: false, week: true, month: true } } },
+    '2025-09-27': { status: 'limited', details: { 'Hot Desk': { hour: false, day: false, week: false, month: false }, 'Meeting Lounge': { hour: true, day: true, week: false, month: false } } },
+    '2025-09-28': { status: 'available', details: { 'Hot Desk': { hour: true, day: true, week: true, month: false }, 'Quiet Desk': { hour: true, day: true, week: false, month: true } } },
+    '2025-09-29': { status: 'booked', details: {} },
+    '2025-09-30': { status: 'limited', details: { 'Whole Room': { hour: false, day: false, week: false, month: true } } },
+    '2025-10-01': { status: 'available', details: { 'Hot Desk': { hour: true, day: true, week: true, month: true }, 'Meeting Lounge': { hour: true, day: true, week: false, month: false } } },
+    '2025-10-02': { status: 'booked', details: {} },
+  };
   
-  // Apply booking data to calendar
-  mockBookings.forEach(booking => {
-    const [bookingYear, bookingMonth, bookingDay] = booking.date.split('-').map(Number);
-    if (bookingYear === year && bookingMonth === month + 1) {
-      addBookingToCalendar(bookingDay, booking);
+  // Apply availability data to calendar
+  Object.entries(mockAvailability).forEach(([dateStr, availability]) => {
+    const [availYear, availMonth, availDay] = dateStr.split('-').map(Number);
+    if (availYear === year && availMonth === month + 1) {
+      applyAvailabilityToCalendar(availDay, availability);
     }
   });
 }
 
-function addBookingToCalendar(day, booking) {
-  const bookingsContainer = document.getElementById(`bookings-${currentCalendarDate.getFullYear()}-${currentCalendarDate.getMonth() + 1}-${day}`);
-  if (bookingsContainer) {
-    const indicator = document.createElement('div');
-    indicator.className = `booking-indicator booking-${booking.type}`;
-    indicator.title = `${booking.type} booking - ${booking.resource}`;
-    bookingsContainer.appendChild(indicator);
+function applyAvailabilityToCalendar(day, availability) {
+  const dayCell = document.querySelector(`[data-date="${currentCalendarDate.getFullYear()}-${String(currentCalendarDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}"]`);
+  if (dayCell) {
+    // Remove any existing availability classes
+    dayCell.classList.remove('availability-available', 'availability-limited', 'availability-booked');
     
-    // Add color coding to the day cell
-    const dayCell = bookingsContainer.closest('.calendar-day');
-    if (dayCell) {
-      dayCell.classList.add(`has-${booking.type}`);
+    // Add appropriate availability class
+    dayCell.classList.add(`availability-${availability.status}`);
+    
+    // Store availability details for when user clicks
+    dayCell.setAttribute('data-availability', JSON.stringify(availability.details));
+    
+    // Add a small indicator for limited availability
+    if (availability.status === 'limited') {
+      const bookingsContainer = dayCell.querySelector('.day-bookings');
+      if (bookingsContainer) {
+        const indicator = document.createElement('div');
+        indicator.className = 'availability-indicator limited';
+        indicator.innerHTML = '⚡';
+        indicator.title = 'Limited availability';
+        bookingsContainer.appendChild(indicator);
+      }
     }
   }
 }
@@ -582,6 +584,7 @@ function selectCalendarDate(dateString) {
 
 function updateSelectedDateInfo(dateString) {
   const info = document.getElementById('selected-date-info');
+  const detailsDiv = document.getElementById('date-availability-details');
   const date = new Date(dateString);
   const formattedDate = date.toLocaleDateString('en-US', { 
     weekday: 'long', 
@@ -590,13 +593,47 @@ function updateSelectedDateInfo(dateString) {
     day: 'numeric' 
   });
   
-  info.innerHTML = `
-    <h6>Selected Date</h6>
-    <p class="mb-2"><strong>${formattedDate}</strong></p>
-    <div class="availability-summary">
-      <small class="text-muted">Availability for selected resources...</small>
-    </div>
-  `;
+  // Get availability details from the clicked date
+  const clickedDay = document.querySelector(`[data-date="${dateString}"]`);
+  const availabilityData = clickedDay ? JSON.parse(clickedDay.getAttribute('data-availability') || '{}') : {};
+  
+  info.querySelector('h6').textContent = 'Selected Date';
+  info.querySelector('p').innerHTML = `<strong>${formattedDate}</strong>`;
+  
+  // Show detailed availability breakdown
+  if (Object.keys(availabilityData).length > 0) {
+    let detailsHTML = '<div class="availability-breakdown mt-3">';
+    
+    Object.entries(availabilityData).forEach(([resource, plans]) => {
+      detailsHTML += `
+        <div class="resource-availability mb-3">
+          <h6 class="small mb-2"><strong>${resource}</strong></h6>
+          <div class="plan-availability">
+            <span class="plan-status ${plans.hour ? 'available' : 'unavailable'}">
+              Hourly ${plans.hour ? '✅' : '❌'}
+            </span>
+            <span class="plan-status ${plans.day ? 'available' : 'unavailable'}">
+              Day ${plans.day ? '✅' : '❌'}
+            </span>
+            <span class="plan-status ${plans.week ? 'available' : 'unavailable'}">
+              Week ${plans.week ? '✅' : '❌'}
+            </span>
+            <span class="plan-status ${plans.month ? 'available' : 'unavailable'}">
+              Month ${plans.month ? '✅' : '❌'}
+            </span>
+          </div>
+        </div>
+      `;
+    });
+    
+    detailsHTML += '</div>';
+    detailsDiv.innerHTML = detailsHTML;
+    detailsDiv.style.display = 'block';
+  } else {
+    // No availability or fully booked
+    detailsDiv.innerHTML = '<div class="mt-3"><small class="text-muted">No availability for this date</small></div>';
+    detailsDiv.style.display = 'block';
+  }
 }
 
 function previousMonth() {
@@ -1017,37 +1054,67 @@ document.addEventListener('DOMContentLoaded', function() {
       border: 1px solid rgba(255,255,255,0.8);
     }
     
-    /* Color coding for different booking types */
-    .calendar-day.has-hour {
-      border-left: 4px solid #03a9f4;
+    /* Simplified 3-color availability system */
+    .calendar-day.availability-available {
+      background: #d4edda;
+      border-left: 4px solid #28a745;
     }
     
-    .calendar-day.has-day {
-      border-left: 4px solid #4caf50;
+    .calendar-day.availability-limited {
+      background: #fff3cd;
+      border-left: 4px solid #ffc107;
     }
     
-    .calendar-day.has-week {
-      border-left: 4px solid #ff9800;
+    .calendar-day.availability-booked {
+      background: #f8d7da;
+      border-left: 4px solid #dc3545;
+      cursor: not-allowed;
     }
     
-    .calendar-day.has-month {
-      border-left: 4px solid #9c27b0;
+    .calendar-day.availability-booked:hover {
+      transform: none;
+      box-shadow: none;
     }
     
-    .booking-hour {
-      background: #03a9f4;
+    .availability-indicator {
+      font-size: 12px;
+      font-weight: bold;
     }
     
-    .booking-day {
-      background: #4caf50;
+    /* Availability breakdown styles */
+    .availability-breakdown {
+      font-size: 0.85rem;
     }
     
-    .booking-week {
-      background: #ff9800;
+    .resource-availability {
+      border-left: 3px solid #007bff;
+      padding-left: 10px;
+      background: #f8f9fa;
+      border-radius: 4px;
+      padding: 8px 10px;
     }
     
-    .booking-month {
-      background: #9c27b0;
+    .plan-availability {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    
+    .plan-status {
+      font-size: 0.75rem;
+      padding: 2px 6px;
+      border-radius: 12px;
+      font-weight: 500;
+    }
+    
+    .plan-status.available {
+      background: #d4edda;
+      color: #155724;
+    }
+    
+    .plan-status.unavailable {
+      background: #f8d7da;
+      color: #721c24;
     }
     
     /* Legend Styles */
