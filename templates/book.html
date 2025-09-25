@@ -879,14 +879,15 @@ function generateDeskIcons(resourceId, capacity, selectedSeats = 0) {
     const isBooked = availabilityData && availabilityData.bookedSeats >= i;
     const isSelected = i <= selectedSeats;
     const iconClass = isBooked ? 'desk-icon booked' : (isSelected ? 'desk-icon selected' : 'desk-icon available');
+    const clickHandler = isBooked ? '' : `onclick="toggleSeat(${resourceId}, ${i})"`;
     
-    iconsHTML += `<span class="${iconClass}" data-seat="${i}" title="Seat ${i}">
+    iconsHTML += `<span class="${iconClass}" data-seat="${i}" title="Seat ${i}" ${clickHandler}>
       🪑${isBooked ? '❌' : (isSelected ? '✅' : '')}
     </span>`;
   }
   
   iconsHTML += '</div>';
-  iconsHTML += '<small class="text-muted">Available: 🪑 | Selected: 🪑✅ | Booked: 🪑❌</small>';
+  iconsHTML += '<small class="text-muted">Click to select: 🪑 | Selected: 🪑✅ | Booked: 🪑❌</small>';
   iconsHTML += '</div>';
   
   return iconsHTML;
@@ -898,27 +899,86 @@ function getCurrentAvailability(resourceId) {
   return { bookedSeats: 0 }; // Simplified for now
 }
 
-function updateDeskIcons(resourceId, selectedSeats) {
+// Track selected seats for each resource
+let selectedSeatsTracker = {};
+
+function toggleSeat(resourceId, seatNumber) {
+  const resource = resourcesData[resourceId];
+  if (!resource) return;
+  
+  // Initialize tracker for this resource if needed
+  if (!selectedSeatsTracker[resourceId]) {
+    selectedSeatsTracker[resourceId] = new Set();
+  }
+  
+  const seatSet = selectedSeatsTracker[resourceId];
+  
+  // Toggle seat selection
+  if (seatSet.has(seatNumber)) {
+    seatSet.delete(seatNumber);
+  } else {
+    seatSet.add(seatNumber);
+  }
+  
+  // Update the seats input field
+  const seatsInput = document.querySelector('[name="seats"]');
+  if (seatsInput) {
+    seatsInput.value = seatSet.size;
+  }
+  
+  // Update visual display
+  updateDeskIconsFromTracker(resourceId);
+  
+  // Update booking summary
+  updateSummary();
+}
+
+function updateDeskIconsFromTracker(resourceId) {
   const resource = resourcesData[resourceId];
   const container = document.getElementById('desk-icons-' + resourceId);
+  const selectedSeats = selectedSeatsTracker[resourceId] || new Set();
+  
   if (container) {
     container.innerHTML = '';
     
     for (let i = 1; i <= resource.capacity; i++) {
-      const isSelected = i <= selectedSeats;
+      const isSelected = selectedSeats.has(i);
       const iconClass = isSelected ? 'desk-icon selected' : 'desk-icon available';
       
-      container.innerHTML += `<span class="${iconClass}" data-seat="${i}" title="Seat ${i}">
+      container.innerHTML += `<span class="${iconClass}" data-seat="${i}" title="Seat ${i}" onclick="toggleSeat(${resourceId}, ${i})">
         🪑${isSelected ? '✅' : ''}
       </span>`;
     }
   }
 }
 
+function updateDeskIcons(resourceId, selectedSeats) {
+  const resource = resourcesData[resourceId];
+  const container = document.getElementById('desk-icons-' + resourceId);
+  
+  // Update tracker to match the input field
+  if (!selectedSeatsTracker[resourceId]) {
+    selectedSeatsTracker[resourceId] = new Set();
+  }
+  
+  const seatSet = selectedSeatsTracker[resourceId];
+  seatSet.clear();
+  
+  // Add seats from 1 to selectedSeats
+  for (let i = 1; i <= Math.min(selectedSeats, resource.capacity); i++) {
+    seatSet.add(i);
+  }
+  
+  updateDeskIconsFromTracker(resourceId);
+}
+
 function showBookingDetails() {
   if (!selectedResource || !selectedPlan) return;
   
   const resource = resourcesData[selectedResource];
+  
+  // Initialize selected seats tracker for this resource
+  selectedSeatsTracker[selectedResource] = new Set([1]); // Start with 1 seat selected
   
   document.getElementById('form-resource-id').value = selectedResource;
   document.getElementById('form-plan-type').value = selectedPlan;
