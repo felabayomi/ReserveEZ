@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+{% block content %}
+<h3>Admin Dashboard</h3>
+
+<div class="row g-4">
+  <!-- Resources Management -->
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-header">Resources Management</div>
+      <div class="card-body">
+        <form class="row g-2 mb-3" method="post" action="/admin/resource">
+          <input type="hidden" name="key" value="{{ key }}">
+          <div class="col-md-4">
+            <input name="name" class="form-control" placeholder="Name" required>
+          </div>
+          <div class="col-md-3">
+            <input name="rate" class="form-control" placeholder="Rate/hr e.g. 6.00" required>
+          </div>
+          <div class="col-md-3">
+            <input name="capacity" class="form-control" placeholder="Capacity" value="10" required>
+          </div>
+          <div class="col-md-2">
+            <button class="btn btn-primary w-100">Add</button>
+          </div>
+        </form>
+        
+        <table class="table table-sm">
+          <tr><th>Name</th><th>Rate</th><th>Capacity</th><th>Status</th><th>Actions</th></tr>
+          {% for r in resources %}
+          <tr>
+            <td>{{ r.name }}</td>
+            <td>${{ "%.2f"|format(r.hourly_rate_cents/100) }}</td>
+            <td>{{ r.capacity }}</td>
+            <td>
+              <span class="badge {{ 'bg-success' if r.active else 'bg-secondary' }}">
+                {{ "Active" if r.active else "Disabled" }}
+              </span>
+            </td>
+            <td>
+              <form method="post" action="/admin/resource-toggle" class="d-inline">
+                <input type="hidden" name="key" value="{{ key }}">
+                <input type="hidden" name="rid" value="{{ r.id }}">
+                <button class="btn btn-outline-secondary btn-sm">Toggle</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Statistics -->
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-header">Statistics</div>
+      <div class="card-body">
+        <div class="row text-center">
+          <div class="col-6">
+            <h4 class="text-primary">{{ as_money(totals.paid) }}</h4>
+            <small class="text-muted">Total Revenue</small>
+          </div>
+          <div class="col-6">
+            <h4 class="text-success">{{ totals.free }}</h4>
+            <small class="text-muted">Free Bookings</small>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="card mt-3">
+      <div class="card-header">Active Passes</div>
+      <div class="card-body">
+        {% if active_passes %}
+        <table class="table table-sm">
+          <tr><th>Email</th><th>Type</th><th>Valid Until</th><th>Actions</th></tr>
+          {% for p in active_passes %}
+          <tr>
+            <td>{{ p.email }}</td>
+            <td><span class="badge bg-info">{{ p.pass_type.title() }}</span></td>
+            <td>{{ p.valid_to.strftime('%b %d, %Y') }}</td>
+            <td>
+              <form method="post" action="/admin/pass-expire" class="d-inline">
+                <input type="hidden" name="key" value="{{ key }}">
+                <input type="hidden" name="pid" value="{{ p.id }}">
+                <button class="btn btn-outline-warning btn-sm">Expire</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </table>
+        {% else %}
+        <p class="text-muted">No active passes</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Payments Management -->
+<div class="row g-4 mt-2">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">Payment Management</div>
+      <div class="card-body">
+        <table class="table table-sm">
+          <tr><th>ID</th><th>Type</th><th>Provider</th><th>Amount</th><th>Status</th><th>Intent ID</th><th>Actions</th></tr>
+          {% for p in payments %}
+          <tr>
+            <td>{{ p.id }}</td>
+            <td>
+              {% if p.booking_id %}
+              <span class="badge bg-primary">Booking</span>
+              {% elif p.pass_id %}
+              <span class="badge bg-info">Pass</span>
+              {% endif %}
+            </td>
+            <td>{{ p.provider.title() }}</td>
+            <td>{{ as_money(p.amount_cents) }}</td>
+            <td>
+              <span class="badge {{ 'bg-success' if p.status == 'paid' else 'bg-warning' if p.status == 'pending' else 'bg-secondary' }}">
+                {{ p.status.upper() }}
+              </span>
+            </td>
+            <td>{{ p.intent_id or '-' }}</td>
+            <td>
+              {% if p.status != 'paid' %}
+              <form method="post" action="/admin/payment-mark-paid" class="d-inline">
+                <input type="hidden" name="key" value="{{ key }}">
+                <input type="hidden" name="pid" value="{{ p.id }}">
+                <div class="input-group input-group-sm" style="width: 200px;">
+                  <input name="txn_id" class="form-control" placeholder="TXN ID" value="{{ p.intent_id or '' }}">
+                  <button class="btn btn-success">Mark Paid</button>
+                </div>
+              </form>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Recent Bookings -->
+<div class="row g-4 mt-2">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">Recent Bookings</div>
+      <div class="card-body">
+        <table class="table table-sm">
+          <tr><th>ID</th><th>Name</th><th>Email</th><th>Resource</th><th>When</th><th>Status</th><th>Amount</th><th>Actions</th></tr>
+          {% for b in latest_bookings %}
+          <tr>
+            <td>{{ b.id }}</td>
+            <td>{{ b.name }}</td>
+            <td>{{ b.email }}</td>
+            <td>{{ b.resource.name }}</td>
+            <td>{{ b.start_dt.strftime('%m/%d %I:%M %p') }}</td>
+            <td>
+              <span class="badge {{ 'bg-success' if b.status in ['paid', 'checked_in'] else 'bg-info' if b.status == 'free' else 'bg-warning' }}">
+                {{ b.status.upper() }}
+              </span>
+            </td>
+            <td>{{ as_money(b.amount_cents) if b.amount_cents > 0 else 'FREE' }}</td>
+            <td>
+              {% if b.status not in ['cancelled', 'checked_in'] %}
+              <form method="post" action="/admin/booking-cancel" class="d-inline">
+                <input type="hidden" name="key" value="{{ key }}">
+                <input type="hidden" name="bid" value="{{ b.id }}">
+                <button class="btn btn-outline-danger btn-sm">Cancel</button>
+              </form>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

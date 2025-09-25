@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row g-4">
+  <div class="col-lg-7">
+    <h1 class="mb-3">Work. Connect. Discover.</h1>
+    <p class="lead">Flexible desks + strong Wi-Fi on the border of Cumberland, MD & Wiley Ford, WV.</p>
+    <p class="text-muted">Opening hours: Mon–Fri 9–6, Sat 10–2. Closed Sun.</p>
+    <a class="btn btn-primary btn-lg" href="{{ url_for('book_page') }}">Book a desk</a>
+  </div>
+  <div class="col-lg-5">
+    <div class="card">
+      <div class="card-header">Today's rates</div>
+      <ul class="list-group list-group-flush">
+        {% for r in resources %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          <div>
+            <strong>{{ r.name }}</strong>
+            <small class="text-muted d-block">Capacity: {{ r.capacity }} seats</small>
+          </div>
+          <span class="badge bg-primary rounded-pill">${{ "%.2f"|format(r.hourly_rate_cents/100) }}/hr</span>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    
+    <div class="card mt-3">
+      <div class="card-header">Passes available</div>
+      <div class="card-body">
+        <p class="small text-muted">Passes let you book free during valid dates (subject to capacity).</p>
+        <ul class="list-unstyled">
+          <li><strong>Day Pass:</strong> $10 — unlimited same-day bookings</li>
+          <li><strong>Weekly Pass:</strong> $30 — 7 days from purchase</li>
+          <li><strong>Monthly Pass:</strong> $120 — 30 days from purchase</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

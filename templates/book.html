@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Reserve your spot</h2>
+
+<!-- Date selection for availability -->
+<form method="get" action="/book" class="row g-3 mb-4">
+  <div class="col-auto">
+    <label class="form-label">See availability for:</label>
+    <input type="date" name="date" value="{{ date }}" class="form-control">
+  </div>
+  <div class="col-auto align-self-end">
+    <button class="btn btn-outline-secondary">Show availability</button>
+  </div>
+</form>
+
+<!-- Availability grid -->
+<div class="card mb-4">
+  <div class="card-header">Availability — {{ date }}</div>
+  <div class="card-body">
+    <table class="table table-sm">
+      <tr><th>Resource</th><th>Capacity</th><th>Booked slots</th></tr>
+      {% for r in resources %}
+      <tr>
+        <td>
+          <strong>{{ r.name }}</strong>
+          <br><small class="text-muted">${{ "%.2f"|format(r.hourly_rate_cents/100) }}/hr</small>
+        </td>
+        <td>
+          {% set info = capacity_info.get(r.id, {'available': r.capacity, 'total': r.capacity}) %}
+          <span class="badge {{ 'bg-success' if info.available > 3 else 'bg-warning' if info.available > 0 else 'bg-danger' }}">
+            {{ info.available }}/{{ info.total }} available
+          </span>
+        </td>
+        <td>
+          {% if grouped.get(r.id) %}
+            {% for b in grouped.get(r.id) %}
+              <span class="badge text-bg-secondary me-1">
+                {{ b.start_dt.strftime("%I:%M %p") }}–{{ b.end_dt.strftime("%I:%M %p") }}
+                ({{ b.status }})
+              </span>
+            {% endfor %}
+          {% else %}
+            <span class="text-success">All day open</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+</div>
+
+<!-- Booking form -->
+<div class="row">
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header">Make a reservation</div>
+      <div class="card-body">
+        <form method="post" action="/book" class="row g-3">
+          <input type="hidden" name="date" value="{{ date }}">
+          
+          <!-- Personal info -->
+          <div class="col-md-6">
+            <label class="form-label">Name</label>
+            <input required name="name" class="form-control" id="user-name">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Email</label>
+            <input required name="email" type="email" class="form-control" id="user-email" oninput="checkActivePass()">
+          </div>
+          
+          <!-- Active pass notification -->
+          <div class="col-12" id="pass-notification" style="display: none;">
+            <div class="alert alert-success">
+              <strong>🎉 Pass active!</strong> You have an active pass until <span id="pass-expiry"></span> — this booking will be free.
+            </div>
+          </div>
+          
+          <!-- Booking type selection -->
+          <div class="col-12">
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="booking_type" id="booking-hourly" value="hourly" checked onchange="toggleBookingType()">
+              <label class="form-check-label" for="booking-hourly">
+                <strong>Book by the hour</strong> — Pay for specific time slots
+              </label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="booking_type" id="booking-pass" value="pass" onchange="toggleBookingType()">
+              <label class="form-check-label" for="booking-pass">
+                <strong>Buy a pass</strong> — Unlimited bookings during validity period
+              </label>
+            </div>
+          </div>
+          
+          <!-- Hourly booking options -->
+          <div id="hourly-options">
+            <div class="col-md-6">
+              <label class="form-label">Resource</label>
+              <select name="resource_id" class="form-select">
+                {% for r in resources %}
+                <option value="{{ r.id }}">{{ r.name }} — ${{ "%.2f"|format(r.hourly_rate_cents/100) }}/hr</option>
+                {% endfor %}
+              </select>
+            </div>
+            
+            <div class="col-md-3">
+              <label class="form-label">Start time</label>
+              <input required type="time" name="start_time" value="09:00" class="form-control">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Hours</label>
+              <input required type="number" name="hours" value="1" min="0.5" step="0.5" class="form-control">
+            </div>
+            
+            <div class="col-md-6">
+              <label class="form-label">Promo code</label>
+              <input name="promo" placeholder="{{ promo }}" class="form-control">
+              <div class="form-text">Use {{ promo }} for a free first booking.</div>
+            </div>
+          </div>
+          
+          <!-- Pass options -->
+          <div id="pass-options" style="display: none;">
+            <div class="col-md-6">
+              <label class="form-label">Pass type</label>
+              <select name="pass_type" class="form-select">
+                <option value="day">Day Pass — $10 (unlimited same-day bookings)</option>
+                <option value="week">Weekly Pass — $30 (7 days from purchase)</option>
+                <option value="month">Monthly Pass — $120 (30 days from purchase)</option>
+              </select>
+            </div>
+          </div>
+          
+          <!-- Payment method -->
+          <div class="col-12">
+            <label class="form-label">Payment method</label>
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="payment_method" id="payment-online" value="online" checked>
+              <label class="form-check-label" for="payment-online">
+                {% if use_mercury %}Online payment (Mercury){% else %}Online payment{% endif %}
+              </label>
+            </div>
+            {% if allow_pos %}
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="payment_method" id="payment-pos" value="pos">
+              <label class="form-check-label" for="payment-pos">
+                Pay at desk (Chase POS) — We'll confirm and email receipt
+              </label>
+            </div>
+            {% endif %}
+          </div>
+          
+          <div class="col-12">
+            <button class="btn btn-primary btn-lg" type="submit">Proceed</button>
+            <a class="btn btn-outline-secondary" href="/">Cancel</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+  
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-header">Quick info</div>
+      <div class="card-body">
+        <h6>Opening Hours</h6>
+        <ul class="list-unstyled small">
+          <li><strong>Mon–Fri:</strong> 9:00 AM – 6:00 PM</li>
+          <li><strong>Saturday:</strong> 10:00 AM – 2:00 PM</li>
+          <li><strong>Sunday:</strong> Closed</li>
+        </ul>
+        
+        <h6>Pass Benefits</h6>
+        <ul class="list-unstyled small">
+          <li>✓ Unlimited bookings during validity</li>
+          <li>✓ Subject to capacity availability</li>
+          <li>✓ No hourly charges</li>
+          <li>✓ Easy online management</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function toggleBookingType() {
+  const isHourly = document.getElementById('booking-hourly').checked;
+  document.getElementById('hourly-options').style.display = isHourly ? 'contents' : 'none';
+  document.getElementById('pass-options').style.display = isHourly ? 'none' : 'contents';
+}
+
+function checkActivePass() {
+  // This would normally make an API call to check for active passes
+  // For now, it's a placeholder
+  const email = document.getElementById('user-email').value;
+  if (email && email.includes('@')) {
+    // Mock check - in real implementation, this would be an AJAX call
+    // document.getElementById('pass-notification').style.display = 'block';
+    // document.getElementById('pass-expiry').textContent = 'Sep 30, 2025';
+  }
+}
+</script>
+
+{% endblock %}

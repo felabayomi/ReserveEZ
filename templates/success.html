@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="alert alert-success">
+  <h4 class="alert-heading">Booking confirmed!</h4>
+  {% if booking %}
+    <p>Your booking is confirmed and {% if booking.status == 'free' %}ready to use{% else %}paid{% endif %}.</p>
+  {% else %}
+    <p>{{ message or 'Your transaction was completed successfully!' }}</p>
+  {% endif %}
+</div>
+
+{% if booking %}
+<div class="card">
+  <div class="card-body">
+    <h5>Booking Details</h5>
+    <p><strong>Name:</strong> {{ booking.name }}</p>
+    <p><strong>Email:</strong> {{ booking.email }}</p>
+    <p><strong>Resource:</strong> {{ booking.resource.name }}</p>
+    <p><strong>When:</strong> {{ booking.start_dt.strftime('%A, %b %d %Y %I:%M %p') }} – {{ booking.end_dt.strftime('%I:%M %p') }} ({{ booking.hours }}h)</p>
+    <p><strong>Status:</strong> 
+      <span class="badge {{ 'bg-success' if booking.status in ['paid', 'free'] else 'bg-warning' }}">{{ booking.status.upper() }}</span>
+    </p>
+    <p><strong>Amount:</strong> {{ as_money(booking.amount_cents) if booking.amount_cents > 0 else 'FREE' }}</p>
+    {% if booking.promo_applied %}
+    <p><strong>Promo:</strong> <span class="badge bg-success">{{ booking.promo_applied }}</span></p>
+    {% endif %}
+    
+    <div class="mt-3">
+      <a class="btn btn-outline-dark" href="/qr/{{ booking.id }}">Download QR for check-in</a>
+      <a class="btn btn-primary" href="/">Back home</a>
+    </div>
+  </div>
+</div>
+{% else %}
+<div class="mt-3">
+  <a class="btn btn-primary" href="/">Back home</a>
+</div>
+{% endif %}
+{% endblock %}
