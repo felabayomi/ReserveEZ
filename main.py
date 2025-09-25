@@ -640,7 +640,12 @@ def book_page():
     resources = Resource.query.filter_by(active=True).all()
     date = request.args.get("date") or dt.date.today().isoformat()
     pre_selected_plan = request.args.get("plan")  # Get pre-selected plan from URL
+    flow_type = request.args.get("flow", "workspace-first")  # Default to workspace-first
     grouped = day_bookings(date)
+    
+    # Determine flow type based on URL parameters
+    if pre_selected_plan and not request.args.get("flow"):
+        flow_type = "plan-first"
     
     # Calculate capacity for each resource for the selected date
     capacity_info = {}
@@ -651,6 +656,14 @@ def book_page():
         available = seats_left(r.id, start_dt, end_dt)
         capacity_info[r.id] = {"available": available, "total": r.capacity}
     
+    # Plan type names for display
+    plan_display_names = {
+        "hour": "Hourly",
+        "day": "Day Pass", 
+        "week": "Week Pass",
+        "month": "Month Pass"
+    }
+    
     return render_template("book.html", 
                          resources=resources, 
                          promo=PROMO_CODE, 
@@ -660,7 +673,9 @@ def book_page():
                          as_money=as_money,
                          use_mercury=USE_MERCURY,
                          allow_pos=ALLOW_POS_CHECKOUT,
-                         pre_selected_plan=pre_selected_plan)
+                         pre_selected_plan=pre_selected_plan,
+                         flow_type=flow_type,
+                         plan_display_names=plan_display_names)
 
 @app.post("/book")
 def create_booking():
