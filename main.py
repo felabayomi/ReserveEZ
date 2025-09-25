@@ -613,7 +613,7 @@ def admin_resource():
     return redirect(url_for("admin_home", key=request.form["key"]))
 
 @app.get("/admin/resource/<int:rid>")
-def admin_resource_edit():
+def admin_resource_edit(rid):
     admin_guard()
     resource = Resource.query.get_or_404(rid)
     return render_template("admin_resource_edit.html", 
