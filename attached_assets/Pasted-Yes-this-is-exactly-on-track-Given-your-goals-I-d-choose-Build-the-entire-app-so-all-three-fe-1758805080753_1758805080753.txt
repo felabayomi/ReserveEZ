@@ -1,0 +1,107 @@
+Yes—this is exactly on track. 👍
+Given your goals, I’d choose “Build the entire app” so all three features (hours, passes, capacity) integrate cleanly in one flow.
+
+Here’s a tight spec you can paste to the agent (and keep for QA):
+
+Upgrade spec (copy to Replit agent)
+
+Add to Resource model:
+	•	capacity INTEGER DEFAULT 10
+	•	opening_hours JSON (e.g. {"mon":[["09:00","18:00"]], "tue":[["09:00","18:00"]], "wed":[["09:00","18:00"]], "thu":[["09:00","18:00"]], "fri":[["09:00","18:00"]], "sat":[["10:00","14:00"]], "sun":[]})
+
+New table Pass:
+
+id PK, email TEXT INDEX, pass_type TEXT CHECK(pass_type IN ('day','week','month')),
+stripe_session_id TEXT, purchase_dt DATETIME, valid_from DATETIME, valid_to DATETIME,
+status TEXT CHECK(status IN ('active','expired','refunded')) DEFAULT 'active'
+
+Booking validation (server):
+	1.	Opening hours check: chosen date/time must be within a window in opening_hours[weekday].
+	2.	Capacity check: for the (resource, time window), count overlapping bookings with status in ('reserved','paid','checked_in','free'). Must be < capacity.
+
+Pass logic:
+	•	If user has an active pass (valid_from ≤ start_dt ≤ valid_to), skip Stripe; booking status='free', amount_cents=0.
+	•	If no pass: proceed to Stripe like now.
+	•	Pass purchase creates a Pass row; webhook sets active + valid_from/valid_to:
+	•	day = midnight→23:59 same day
+	•	week = 7 days from purchase (or next Monday–Sunday; pick one and document)
+	•	month = 30 days from purchase
+
+UI updates:
+	•	On /book:
+	•	Show capacity badge per resource: e.g., “Desks left today: 7/10” (compute for selected slot too).
+	•	Radio: [ Book by the hour ] or [ Buy a pass (Day / Week / Month) ]
+	•	If pass selected → Stripe Checkout for pass products; on success, show “Pass active until {date}”.
+	•	When user enters email, if they have an active pass, show “Pass active (free bookings until {date})”.
+
+Stripe products (create or let agent create):
+	•	Products: EasyDesk Day Pass, EasyDesk Weekly Pass, EasyDesk Monthly Pass
+	•	Prices (example): Day $10, Week $30, Month $120 (adjust later)
+	•	Webhooks: handle checkout.session.completed for both booking sessions and pass sessions (differentiate via metadata.type='pass'|'booking').
+
+Admin enhancements:
+	•	/admin?key=...:
+	•	Edit capacity & opening hours per resource (simple JSON textarea or small form per weekday).
+	•	List active passes (email, type, valid_to) + manual expire.
+	•	Toggle: “Allow pay-on-arrival” (existing) and “Require account for pass use” (optional).
+
+Migrations (SQLite, Alembic or manual):
+
+ALTER TABLE resource ADD COLUMN capacity INTEGER DEFAULT 10;
+ALTER TABLE resource ADD COLUMN opening_hours TEXT;
+CREATE TABLE pass (
+  id INTEGER PRIMARY KEY,
+  email TEXT,
+  pass_type TEXT,
+  stripe_session_id TEXT,
+  purchase_dt DATETIME,
+  valid_from DATETIME,
+  valid_to DATETIME,
+  status TEXT
+);
+CREATE INDEX idx_pass_email ON pass(email);
+
+Server helpers (pseudo):
+
+def is_in_hours(resource, start_dt, end_dt): ...
+def seats_left(resource_id, start_dt, end_dt):
+    used = Booking.query.filter(...overlap...).count()
+    cap = Resource.query.get(resource_id).capacity
+    return max(0, cap - used)
+
+def active_pass(email, at_dt):
+    return Pass.query.filter_by(email=email, status='active')\
+        .filter(Pass.valid_from <= at_dt, Pass.valid_to >= at_dt).first()
+
+Booking flow update:
+	•	After form submit:
+	•	validate hours → if fail, flash msg
+	•	check capacity → if seats_left == 0, flash “Slot full”
+	•	if active_pass(email, start_dt) → create booking free
+	•	else → Stripe Checkout (booking)
+	•	Pass purchase flow:
+	•	create Stripe session with metadata={'type':'pass','pass_type':'week','email':email}
+	•	webhook computes valid_from/valid_to and inserts Pass
+
+Availability grid:
+	•	Keep day view; add per-slot badge after user picks start time/hours (AJAX or server-side reload).
+
+Emails:
+	•	For pass purchase: “Your [Day/Week/Month] Pass is active until {valid_to}.”
+	•	For capacity full: include next 3 closest open times.
+
+Copy (front-end):
+	•	“Opening hours: Mon–Fri 9–6, Sat 10–2. Closed Sun.” (pull from DB)
+	•	“Passes let you book free during valid dates (subject to capacity).”
+
+⸻
+
+Quick acceptance checklist (after agent builds)
+	•	Can’t book outside opening hours.
+	•	Capacity reduces with overlapping bookings; blocks when full.
+	•	Buying a pass activates it via webhook; subsequent bookings for same email are $0 during validity.
+	•	Admin can edit capacity/hours; changes apply immediately.
+	•	Stripe sessions correctly tagged via metadata.type.
+	•	Emails (optional) send for both bookings and passes.
+
+If you want staged instead, ask the agent: “Implement capacity + hours first, then passes.” But the all-in build is fine too.

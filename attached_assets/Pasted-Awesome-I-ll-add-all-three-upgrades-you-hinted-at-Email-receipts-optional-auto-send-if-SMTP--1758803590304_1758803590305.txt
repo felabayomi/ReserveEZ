@@ -1,0 +1,259 @@
+Awesome — I’ll add all three upgrades you hinted at:
+	•	Email receipts (optional; auto-send if SMTP/SendGrid creds exist)
+	•	Calendar file (.ics) download for each booking
+	•	Simple day-view availability grid on the booking page
+
+Below are surgical additions you can paste into your current app. No need to rewire anything else.
+
+⸻
+
+0) New secrets in .env (optional for email)
+
+# Email (OPTIONAL – leave blank to disable)
+SMTP_HOST=smtp.sendgrid.net
+SMTP_PORT=587
+SMTP_USER=apikey
+SMTP_PASS=YOUR_SENDGRID_API_KEY
+FROM_EMAIL=hello@citydiscoverer.guide
+FROM_NAME=City Discoverer EasyDesk
+
+
+⸻
+
+1) Add helpers to main.py (near other imports / utils)
+
+import smtplib
+from email.mime.text import MIMEText
+from email.utils import formataddr
+
+def email_enabled():
+    return all([
+        os.getenv("SMTP_HOST"),
+        os.getenv("SMTP_PORT"),
+        os.getenv("SMTP_USER"),
+        os.getenv("SMTP_PASS"),
+        os.getenv("FROM_EMAIL"),
+        os.getenv("FROM_NAME"),
+    ])
+
+def send_receipt_email(booking: Booking):
+    if not email_enabled(): 
+        return
+    host = os.getenv("SMTP_HOST")
+    port = int(os.getenv("SMTP_PORT", "587"))
+    user = os.getenv("SMTP_USER")
+    pwd  = os.getenv("SMTP_PASS")
+    from_email = os.getenv("FROM_EMAIL")
+    from_name  = os.getenv("FROM_NAME")
+    subject = f"Your EasyDesk booking #{booking.id}"
+    body = f"""
+Hi {booking.name},
+
+Your booking is confirmed.
+
+When: {booking.start_dt:%A, %b %d %Y %I:%M %p} – {booking.end_dt:%I:%M %p}
+Resource: {booking.resource.name}
+Status: {booking.status.upper()}
+Amount: {as_money(booking.amount_cents)}
+
+Add to calendar:
+{BASE_URL}/ics/{booking.id}
+
+Need help? Reply to this email.
+
+— City Discoverer EasyDesk
+"""
+    msg = MIMEText(body)
+    msg["From"] = formataddr((from_name, from_email))
+    msg["To"]   = booking.email
+    msg["Subject"] = subject
+
+    with smtplib.SMTP(host, port) as s:
+        s.starttls()
+        s.login(user, pwd)
+        s.sendmail(from_email, [booking.email], msg.as_string())
+
+
+⸻
+
+2) Send email after payment & after free booking
+
+In /success route, after setting status="paid":
+
+    if b.status != "paid":
+        b.status = "paid"
+        db.session.commit()
+        send_receipt_email(b)   # <-- add this
+
+In /success-free route, append:
+
+    send_receipt_email(b)      # <-- add this
+
+
+⸻
+
+3) Add .ics calendar download route
+
+@app.get("/ics/<int:bid>")
+def ics(bid):
+    b = Booking.query.get_or_404(bid)
+    uid = f"booking-{b.id}@easydesk"
+    def fmt(dt_obj): return dt_obj.strftime("%Y%m%dT%H%M%S")
+    ics_text = f"""BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//City Discoverer EasyDesk//EN
+BEGIN:VEVENT
+UID:{uid}
+DTSTAMP:{fmt(dt.datetime.utcnow())}Z
+DTSTART:{fmt(b.start_dt)}
+DTEND:{fmt(b.end_dt)}
+SUMMARY:EasyDesk – {b.resource.name}
+DESCRIPTION:Booking #{b.id} – {as_money(b.amount_cents)} – Status: {b.status}
+LOCATION:50 Stately St, Suite 2, Wiley Ford WV 26767
+END:VEVENT
+END:VCALENDAR
+"""
+    return send_file(
+        io.BytesIO(ics_text.encode("utf-8")),
+        mimetype="text/calendar",
+        as_attachment=True,
+        download_name=f"easydesk-booking-{b.id}.ics"
+    )
+
+Tip: In templates/success.html, add a button:
+
+<a class="btn btn-outline-secondary" href="/ics/{{ booking.id }}">Add to calendar (.ics)</a>
+
+
+⸻
+
+4) Day-view availability grid on the booking page
+
+4a) Add a small query helper in main.py
+
+def day_bookings(date_str):
+    # returns bookings grouped by resource for that day
+    y, m, d = map(int, date_str.split("-"))
+    start = dt.datetime(y, m, d, 0, 0)
+    end   = start + dt.timedelta(days=1)
+    rows = (Booking.query
+            .filter(Booking.start_dt < end,
+                    Booking.end_dt > start,
+                    Booking.status.in_(["reserved","paid","checked_in","free"]))
+            .order_by(Booking.resource_id, Booking.start_dt)
+            .all())
+    grouped = {}
+    for b in rows:
+        grouped.setdefault(b.resource_id, []).append(b)
+    return grouped
+
+4b) Update GET /book to accept ?date=YYYY-MM-DD
+
+Replace your current book_page with:
+
+@app.get("/book")
+def book_page():
+    resources = Resource.query.filter_by(active=True).all()
+    date = request.args.get("date") or dt.date.today().isoformat()
+    grouped = day_bookings(date)
+    return render_template("book.html", 
+                           resources=resources, 
+                           promo=PROMO_CODE, 
+                           date=date, 
+                           grouped=grouped,
+                           as_money=as_money)
+
+4c) Update templates/book.html to show grid
+
+Add a date picker at the top and an availability table:
+
+{% extends "base.html" %}
+{% block content %}
+<h2>Reserve your spot</h2>
+
+<form method="get" action="/book" class="row g-3 mb-3">
+  <div class="col-auto">
+    <label class="form-label">See availability for:</label>
+    <input type="date" name="date" value="{{ date }}" class="form-control">
+  </div>
+  <div class="col-auto align-self-end">
+    <button class="btn btn-outline-secondary">Show</button>
+  </div>
+</form>
+
+<div class="card mb-4">
+  <div class="card-header">Availability — {{ date }}</div>
+  <div class="card-body">
+    <table class="table table-sm">
+      <tr><th>Resource</th><th>Booked slots</th></tr>
+      {% for r in resources %}
+      <tr>
+        <td>{{ r.name }}</td>
+        <td>
+          {% if grouped.get(r.id) %}
+            {% for b in grouped.get(r.id) %}
+              <span class="badge text-bg-secondary me-1">
+                {{ b.start_dt.strftime("%I:%M %p") }}–{{ b.end_dt.strftime("%I:%M %p") }}
+                ({{ b.status }})
+              </span>
+            {% endfor %}
+          {% else %}
+            <span class="text-success">All day open</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+</div>
+
+<form method="post" action="/book" class="row g-3">
+  <input type="hidden" name="date" value="{{ date }}">
+  <div class="col-md-6">
+    <label class="form-label">Name</label>
+    <input required name="name" class="form-control">
+  </div>
+  <div class="col-md-6">
+    <label class="form-label">Email</label>
+    <input required name="email" type="email" class="form-control">
+  </div>
+
+  <div class="col-md-6">
+    <label class="form-label">Resource</label>
+    <select name="resource_id" class="form-select">
+      {% for r in resources %}
+      <option value="{{ r.id }}">{{ r.name }} — ${{ "%.2f"|format(r.hourly_rate_cents/100) }}/hr</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div class="col-md-3">
+    <label class="form-label">Start time</label>
+    <input required type="time" name="start_time" value="09:00" class="form-control">
+  </div>
+  <div class="col-md-3">
+    <label class="form-label">Hours</label>
+    <input required type="number" name="hours" value="1" min="1" step="0.5" class="form-control">
+  </div>
+
+  <div class="col-md-4">
+    <label class="form-label">Promo code</label>
+    <input name="promo" placeholder="{{ promo }}" class="form-control">
+    <div class="form-text">Use {{ promo }} for a free first booking.</div>
+  </div>
+
+  <div class="col-12">
+    <button class="btn btn-primary btn-lg">Proceed</button>
+    <a class="btn btn-outline-secondary" href="/">Cancel</a>
+  </div>
+</form>
+{% endblock %}
+
+
+⸻
+
+That’s it
+	•	Users can see open times, book, get a free first session, download a calendar file, and (optionally) receive an email receipt.
+	•	You can admin with …/admin?key=YOUR_ADMIN_PASSWORD.
+
+Want me to add hourly opening hours, recurring passes (day/week), or a capacity counter per resource next?

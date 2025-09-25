@@ -1,0 +1,409 @@
+Perfect — here’s a drop-in upgrade that adds:
+	•	Promo code EASYWEEK → 100% off the first booking per email.
+	•	A tiny Admin screen (password via secret) to view/cancel bookings & add/disable resources.
+
+You can paste these over your existing files.
+
+⸻
+
+1) Add to .env (Replit Secrets)
+
+ADMIN_PASSWORD=change-this
+PROMO_CODE=EASYWEEK
+
+
+⸻
+
+2) Replace main.py with this version
+
+import os, datetime as dt, io
+from decimal import Decimal
+from flask import Flask, render_template, request, redirect, url_for, abort, jsonify, send_file, flash
+from flask_sqlalchemy import SQLAlchemy
+from dotenv import load_dotenv
+import stripe, qrcode
+
+load_dotenv()
+
+app = Flask(__name__)
+app.config["SECRET_KEY"] = os.getenv("FLASK_SECRET", "dev")
+app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL", "sqlite:///easydesk.db")
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+db = SQLAlchemy(app)
+
+stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
+STRIPE_PUB = os.getenv("STRIPE_PUBLISHABLE_KEY")
+WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET")
+BASE_URL = os.getenv("BASE_URL", "http://localhost:5000")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin")
+PROMO_CODE = os.getenv("PROMO_CODE", "EASYWEEK").strip().upper()
+
+# ---------------- Models ----------------
+class Resource(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False)
+    hourly_rate_cents = db.Column(db.Integer, nullable=False)
+    active = db.Column(db.Boolean, default=True)
+
+class Booking(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(200), nullable=False, index=True)
+    name = db.Column(db.String(120))
+    resource_id = db.Column(db.Integer, db.ForeignKey("resource.id"), nullable=False)
+    start_dt = db.Column(db.DateTime, nullable=False)
+    end_dt   = db.Column(db.DateTime, nullable=False)
+    hours = db.Column(db.Float, nullable=False)
+    amount_cents = db.Column(db.Integer, nullable=False)
+    status = db.Column(db.String(20), default="reserved")  # reserved|paid|cancelled|checked_in|free
+    stripe_session_id = db.Column(db.String(120))
+    promo_applied = db.Column(db.String(40))  # stores code when used
+    created_at = db.Column(db.DateTime, default=dt.datetime.utcnow)
+
+    resource = db.relationship("Resource")
+
+with app.app_context():
+    db.create_all()
+    if Resource.query.count() == 0:
+        db.session.add_all([
+            Resource(name="Hot Desk",    hourly_rate_cents=600),
+            Resource(name="Quiet Desk",  hourly_rate_cents=700),
+            Resource(name="Meeting Table (2–4)", hourly_rate_cents=1200),
+            Resource(name="Whole Room",  hourly_rate_cents=2000),
+        ])
+        db.session.commit()
+
+# ---------------- Utils ----------------
+def parse_dt(date_str, time_str):
+    y, m, d = map(int, date_str.split("-"))
+    hh, mm = map(int, time_str.split(":"))
+    return dt.datetime(y, m, d, hh, mm)
+
+def as_money(cents): return f"${Decimal(cents)/Decimal(100):.2f}"
+
+def user_has_used_promo(email: str, code: str) -> bool:
+    return Booking.query.filter(
+        Booking.email==email,
+        Booking.promo_applied==code,
+        Booking.status.in_(["paid","free","checked_in"])
+    ).count() > 0
+
+# ---------------- Public ----------------
+@app.get("/")
+def index():
+    resources = Resource.query.filter_by(active=True).all()
+    return render_template("index.html", resources=resources, STRIPE_PUB=STRIPE_PUB)
+
+@app.get("/book")
+def book_page():
+    resources = Resource.query.filter_by(active=True).all()
+    return render_template("book.html", resources=resources, promo=PROMO_CODE)
+
+@app.post("/book")
+def create_booking():
+    resource_id = int(request.form["resource_id"])
+    date = request.form["date"]
+    start = request.form["start_time"]
+    hours = float(request.form.get("hours", "1"))
+    name = request.form["name"]
+    email = request.form["email"].strip().lower()
+    code = request.form.get("promo","").strip().upper()
+
+    res = Resource.query.get_or_404(resource_id)
+    start_dt = parse_dt(date, start)
+    end_dt = start_dt + dt.timedelta(hours=hours)
+    amount_cents = int(res.hourly_rate_cents * hours)
+
+    # Very simple overlap check (same resource):
+    overlap = Booking.query.filter(
+        Booking.resource_id==res.id,
+        Booking.status.in_(["reserved","paid","checked_in","free"]),
+        Booking.start_dt < end_dt,
+        Booking.end_dt > start_dt
+    ).first()
+    if overlap:
+        flash("That time overlaps with an existing booking. Try another slot.", "warning")
+        return redirect(url_for("book_page"))
+
+    # Promo: EASYWEEK = first booking free (per email)
+    apply_free = (code == PROMO_CODE) and not user_has_used_promo(email, PROMO_CODE)
+
+    b = Booking(
+        email=email, name=name, resource_id=res.id,
+        start_dt=start_dt, end_dt=end_dt, hours=hours,
+        amount_cents=0 if apply_free else amount_cents,
+        status="free" if apply_free else "reserved",
+        promo_applied=PROMO_CODE if apply_free else None
+    )
+    db.session.add(b); db.session.commit()
+
+    if apply_free or amount_cents == 0:
+        # Skip Stripe entirely
+        return redirect(url_for("success_free", bid=b.id))
+
+    session = stripe.checkout.Session.create(
+        mode="payment",
+        payment_method_types=["card"],
+        line_items=[{
+            "price_data": {
+                "currency": "usd",
+                "product_data": {"name": f"{res.name} ({hours}h)"},
+                "unit_amount": amount_cents,
+            },
+            "quantity": 1
+        }],
+        success_url=f"{BASE_URL}/success?session_id={{CHECKOUT_SESSION_ID}}",
+        cancel_url=f"{BASE_URL}/cancel?bid={b.id}",
+        metadata={"booking_id": b.id, "email": email}
+    )
+    b.stripe_session_id = session.id
+    db.session.commit()
+    return redirect(session.url, code=303)
+
+@app.get("/success")
+def success():
+    session_id = request.args.get("session_id")
+    if not session_id: abort(400)
+    session = stripe.checkout.Session.retrieve(session_id)
+    bid = session.metadata.get("booking_id")
+    b = Booking.query.get_or_404(bid)
+    if b.status != "paid":
+        b.status = "paid"
+        db.session.commit()
+    return render_template("success.html", booking=b, as_money=as_money)
+
+@app.get("/success-free")
+def success_free():
+    bid = int(request.args.get("bid"))
+    b = Booking.query.get_or_404(bid)
+    return render_template("success.html", booking=b, as_money=as_money)
+
+@app.get("/cancel")
+def cancel():
+    bid = request.args.get("bid")
+    return render_template("cancel.html", bid=bid)
+
+@app.post("/stripe/webhook")
+def stripe_webhook():
+    payload = request.data
+    sig = request.headers.get("Stripe-Signature", "")
+    try:
+        event = stripe.Webhook.construct_event(payload, sig, WEBHOOK_SECRET)
+    except Exception as e:
+        return str(e), 400
+    if event["type"] == "checkout.session.completed":
+        s = event["data"]["object"]
+        bid = s["metadata"]["booking_id"]
+        b = Booking.query.get(bid)
+        if b:
+            b.status = "paid"
+            db.session.commit()
+    return "ok"
+
+@app.get("/qr/<int:bid>")
+def qr(bid):
+    img = qrcode.make(f"{BASE_URL}/checkin/{bid}")
+    buf = io.BytesIO(); img.save(buf, format="PNG"); buf.seek(0)
+    return send_file(buf, mimetype="image/png")
+
+@app.get("/checkin/<int:bid>")
+def checkin(bid):
+    b = Booking.query.get_or_404(bid)
+    b.status = "checked_in"
+    db.session.commit()
+    return f"Checked in booking #{b.id} for {b.name} – {b.resource.name}"
+
+# ---------------- Admin (very light) ----------------
+def admin_guard():
+    pwd = request.args.get("key") or request.form.get("key")
+    if pwd != ADMIN_PASSWORD: abort(401)
+
+@app.get("/admin")
+def admin_home():
+    admin_guard()
+    resources = Resource.query.order_by(Resource.active.desc(), Resource.name).all()
+    latest = Booking.query.order_by(Booking.created_at.desc()).limit(50).all()
+    totals = {
+        "paid": sum(b.amount_cents for b in Booking.query.filter_by(status="paid")),
+        "free": Booking.query.filter_by(status="free").count()
+    }
+    return render_template("admin.html", resources=resources, latest=latest, totals=totals, key=request.args.get("key"))
+
+@app.post("/admin/resource")
+def admin_resource():
+    admin_guard()
+    name = request.form["name"].strip()
+    rate = int(float(request.form["rate"]) * 100)
+    db.session.add(Resource(name=name, hourly_rate_cents=rate, active=True))
+    db.session.commit()
+    return redirect(url_for("admin_home", key=request.form["key"]))
+
+@app.post("/admin/resource-toggle")
+def admin_resource_toggle():
+    admin_guard()
+    rid = int(request.form["rid"])
+    r = Resource.query.get_or_404(rid)
+    r.active = not r.active
+    db.session.commit()
+    return redirect(url_for("admin_home", key=request.form["key"]))
+
+@app.post("/admin/booking-cancel")
+def admin_booking_cancel():
+    admin_guard()
+    bid = int(request.form["bid"])
+    b = Booking.query.get_or_404(bid)
+    b.status = "cancelled"
+    db.session.commit()
+    return redirect(url_for("admin_home", key=request.form["key"]))
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000, debug=True)
+
+
+⸻
+
+3) Update templates/book.html
+
+{% extends "base.html" %}
+{% block content %}
+<h2>Reserve your spot</h2>
+<form method="post" action="/book" class="row g-3">
+  <div class="col-md-6">
+    <label class="form-label">Name</label>
+    <input required name="name" class="form-control">
+  </div>
+  <div class="col-md-6">
+    <label class="form-label">Email</label>
+    <input required name="email" type="email" class="form-control">
+  </div>
+
+  <div class="col-md-6">
+    <label class="form-label">Resource</label>
+    <select name="resource_id" class="form-select">
+      {% for r in resources %}
+      <option value="{{ r.id }}">{{ r.name }} — ${{ "%.2f"|format(r.hourly_rate_cents/100) }}/hr</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div class="col-md-3">
+    <label class="form-label">Date</label>
+    <input required type="date" name="date" class="form-control">
+  </div>
+  <div class="col-md-3">
+    <label class="form-label">Start time</label>
+    <input required type="time" name="start_time" value="09:00" class="form-control">
+  </div>
+
+  <div class="col-md-3">
+    <label class="form-label">Hours</label>
+    <input required type="number" name="hours" value="1" min="1" step="0.5" class="form-control">
+  </div>
+
+  <div class="col-md-3">
+    <label class="form-label">Promo code</label>
+    <input name="promo" placeholder="{{ promo }}" class="form-control">
+    <div class="form-text">Use {{ promo }} for a free first booking.</div>
+  </div>
+
+  <div class="col-12">
+    <button class="btn btn-primary btn-lg">Proceed</button>
+    <a class="btn btn-outline-secondary" href="/">Cancel</a>
+  </div>
+</form>
+{% endblock %}
+
+
+⸻
+
+4) New template templates/admin.html
+
+{% extends "base.html" %}
+{% block content %}
+<h3>Admin</h3>
+
+<div class="row g-3">
+  <div class="col-md-6">
+    <div class="card">
+      <div class="card-header">Resources</div>
+      <div class="card-body">
+        <form class="row g-2" method="post" action="/admin/resource">
+          <input type="hidden" name="key" value="{{ key }}">
+          <div class="col-md-6"><input name="name" class="form-control" placeholder="Name"></div>
+          <div class="col-md-4"><input name="rate" class="form-control" placeholder="Rate/hr e.g. 6.00"></div>
+          <div class="col-md-2"><button class="btn btn-primary w-100">Add</button></div>
+        </form>
+        <hr>
+        <table class="table table-sm">
+          <tr><th>Name</th><th>Rate</th><th>Status</th><th></th></tr>
+          {% for r in resources %}
+          <tr>
+            <td>{{ r.name }}</td>
+            <td>${{ "%.2f"|format(r.hourly_rate_cents/100) }}</td>
+            <td>{{ "Active" if r.active else "Disabled" }}</td>
+            <td>
+              <form method="post" action="/admin/resource-toggle" class="d-inline">
+                <input type="hidden" name="key" value="{{ key }}">
+                <input type="hidden" name="rid" value="{{ r.id }}">
+                <button class="btn btn-outline-secondary btn-sm">Toggle</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-6">
+    <div class="card">
+      <div class="card-header">Recent bookings</div>
+      <div class="card-body">
+        <p class="text-muted">Paid total: ${{ "%.2f"|format(totals.paid/100) }} · Free uses: {{ totals.free }}</p>
+        <table class="table table-sm">
+          <tr><th>ID</th><th>Name</th><th>Email</th><th>When</th><th>Res</th><th>Status</th><th>$</th><th></th></tr>
+          {% for b in latest %}
+          <tr>
+            <td>{{ b.id }}</td>
+            <td>{{ b.name }}</td>
+            <td>{{ b.email }}</td>
+            <td>{{ b.start_dt.strftime("%m/%d %H:%M") }} → {{ b.end_dt.strftime("%H:%M") }}</td>
+            <td>{{ b.resource.name }}</td>
+            <td>{{ b.status }}</td>
+            <td>${{ "%.2f"|format(b.amount_cents/100) }}</td>
+            <td>
+              {% if b.status != "cancelled" %}
+              <form method="post" action="/admin/booking-cancel" class="d-inline">
+                <input type="hidden" name="key" value="{{ key }}">
+                <input type="hidden" name="bid" value="{{ b.id }}">
+                <button class="btn btn-outline-danger btn-sm">Cancel</button>
+              </form>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+
+⸻
+
+How to open Admin
+
+Visit:
+
+/admin?key=YOUR_ADMIN_PASSWORD
+
+(Use the value you set in ADMIN_PASSWORD.)
+
+⸻
+
+Notes
+	•	Promo logic: EASYWEEK grants one free booking per email (marked status="free"). Stripe is bypassed.
+	•	Basic overlap check is included. For stricter rules (opening hours, min/max duration), we can add them next.
+	•	Admin is intentionally lightweight—no login session, just a key param. Fine for MVP; replace with real auth later.
+
+If you want me to add email receipts, calendar .ics download, or a day-view availability grid, say the word and I’ll extend this build.

@@ -1,0 +1,368 @@
+Awesome—here’s a minimal, runnable starter for EasyDesk Booking on Replit.
+It creates desks, lets users pick a slot, takes payment via Stripe Checkout, and confirms the booking. You can expand from here.
+
+⸻
+
+1) requirements.txt
+
+flask==3.0.3
+flask_sqlalchemy==3.1.1
+flask_login==0.6.3
+stripe==7.10.0
+python-dotenv==1.0.1
+qrcode==7.4.2
+Pillow==10.4.0
+
+
+⸻
+
+2) .env (Replit → Tools → Secrets)
+
+FLASK_SECRET=change-me
+DATABASE_URL=sqlite:///easydesk.db
+
+STRIPE_SECRET_KEY=sk_live_or_test_key
+STRIPE_PUBLISHABLE_KEY=pk_live_or_test_key
+STRIPE_WEBHOOK_SECRET=whsec_...
+BASE_URL=https://<your-replit-url>     # e.g. https://easydesk.<user>.repl.co
+
+
+⸻
+
+3) main.py
+
+import os, datetime as dt, io
+from decimal import Decimal
+from flask import Flask, render_template, request, redirect, url_for, abort, jsonify, send_file
+from flask_sqlalchemy import SQLAlchemy
+from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+from dotenv import load_dotenv
+import stripe
+import qrcode
+
+load_dotenv()
+
+app = Flask(__name__)
+app.config["SECRET_KEY"] = os.getenv("FLASK_SECRET", "dev")
+app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL", "sqlite:///easydesk.db")
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+db = SQLAlchemy(app)
+
+stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
+STRIPE_PUB = os.getenv("STRIPE_PUBLISHABLE_KEY")
+WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET")
+BASE_URL = os.getenv("BASE_URL", "http://localhost:5000")
+
+# ---------------- Models ----------------
+class User(db.Model, UserMixin):
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(200), unique=True, nullable=False)
+    name = db.Column(db.String(120))
+    role = db.Column(db.String(20), default="user")  # user/admin
+
+class Resource(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False)          # “Hot Desk”, etc.
+    hourly_rate_cents = db.Column(db.Integer, nullable=False)  # e.g. 600 = $6
+    active = db.Column(db.Boolean, default=True)
+
+class Booking(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(200), nullable=False)
+    name = db.Column(db.String(120))
+    resource_id = db.Column(db.Integer, db.ForeignKey("resource.id"), nullable=False)
+    start_dt = db.Column(db.DateTime, nullable=False)
+    end_dt   = db.Column(db.DateTime, nullable=False)
+    hours = db.Column(db.Float, nullable=False)
+    amount_cents = db.Column(db.Integer, nullable=False)
+    status = db.Column(db.String(20), default="reserved")  # reserved|paid|cancelled|checked_in
+    stripe_session_id = db.Column(db.String(120))
+    created_at = db.Column(db.DateTime, default=dt.datetime.utcnow)
+
+    resource = db.relationship("Resource")
+
+# --------------- bootstrap DB ---------------
+with app.app_context():
+    db.create_all()
+    if Resource.query.count() == 0:
+        db.session.add_all([
+            Resource(name="Hot Desk",    hourly_rate_cents=600),
+            Resource(name="Quiet Desk",  hourly_rate_cents=700),
+            Resource(name="Meeting Table (2–4)", hourly_rate_cents=1200),
+            Resource(name="Whole Room",  hourly_rate_cents=2000),
+        ])
+        db.session.commit()
+
+# ---------------- Utils ----------------
+def parse_dt(date_str, time_str):
+    # date: YYYY-MM-DD, time: "HH:MM"
+    y, m, d = map(int, date_str.split("-"))
+    hh, mm = map(int, time_str.split(":"))
+    return dt.datetime(y, m, d, hh, mm)
+
+def as_money(cents):
+    return f"${Decimal(cents) / Decimal(100):.2f}"
+
+# ---------------- Routes ----------------
+@app.get("/")
+def index():
+    resources = Resource.query.filter_by(active=True).all()
+    return render_template("index.html", resources=resources, STRIPE_PUB=STRIPE_PUB)
+
+@app.get("/book")
+def book_page():
+    resources = Resource.query.filter_by(active=True).all()
+    return render_template("book.html", resources=resources)
+
+@app.post("/book")
+def create_booking():
+    # Simple, no account: collect name/email + slot
+    resource_id = int(request.form["resource_id"])
+    date = request.form["date"]            # YYYY-MM-DD
+    start = request.form["start_time"]     # HH:MM
+    hours = float(request.form.get("hours", "1"))
+    name = request.form["name"]
+    email = request.form["email"]
+
+    res = Resource.query.get_or_404(resource_id)
+    start_dt = parse_dt(date, start)
+    end_dt = start_dt + dt.timedelta(hours=hours)
+    amount_cents = int(res.hourly_rate_cents * hours)
+
+    # TODO: collision check (simplified skip for MVP)
+    b = Booking(
+        email=email, name=name,
+        resource_id=res.id, start_dt=start_dt, end_dt=end_dt,
+        hours=hours, amount_cents=amount_cents, status="reserved"
+    )
+    db.session.add(b); db.session.commit()
+
+    # Create Stripe Checkout
+    session = stripe.checkout.Session.create(
+        mode="payment",
+        payment_method_types=["card"],
+        line_items=[{
+            "price_data": {
+                "currency": "usd",
+                "product_data": {"name": f"{res.name} ({hours}h)"},
+                "unit_amount": amount_cents,
+            },
+            "quantity": 1
+        }],
+        success_url=f"{BASE_URL}/success?session_id={{CHECKOUT_SESSION_ID}}",
+        cancel_url=f"{BASE_URL}/cancel?bid={b.id}",
+        metadata={"booking_id": b.id}
+    )
+    b.stripe_session_id = session.id
+    db.session.commit()
+    return redirect(session.url, code=303)
+
+@app.get("/success")
+def success():
+    session_id = request.args.get("session_id")
+    if not session_id:
+        abort(400)
+    session = stripe.checkout.Session.retrieve(session_id)
+    # Mark booking paid
+    bid = session.metadata.get("booking_id")
+    b = Booking.query.get(bid)
+    if b and b.status != "paid":
+        b.status = "paid"
+        db.session.commit()
+    return render_template("success.html", booking=b, as_money=as_money)
+
+@app.get("/cancel")
+def cancel():
+    bid = request.args.get("bid")
+    return render_template("cancel.html", bid=bid)
+
+@app.post("/stripe/webhook")
+def stripe_webhook():
+    payload = request.data
+    sig = request.headers.get("Stripe-Signature", "")
+    try:
+        event = stripe.Webhook.construct_event(payload, sig, WEBHOOK_SECRET)
+    except Exception as e:
+        return str(e), 400
+
+    if event["type"] == "checkout.session.completed":
+        session = event["data"]["object"]
+        bid = session["metadata"]["booking_id"]
+        b = Booking.query.get(bid)
+        if b:
+            b.status = "paid"
+            db.session.commit()
+    return "ok"
+
+@app.get("/qr/<int:bid>")
+def qr(bid):
+    # QR representing check-in URL (admin flow later)
+    img = qrcode.make(f"{BASE_URL}/checkin/{bid}")
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    buf.seek(0)
+    return send_file(buf, mimetype="image/png")
+
+@app.get("/checkin/<int:bid>")
+def checkin(bid):
+    b = Booking.query.get_or_404(bid)
+    b.status = "checked_in"
+    db.session.commit()
+    return f"Checked in booking #{b.id} for {b.name} – {b.resource.name}"
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000, debug=True)
+
+
+⸻
+
+4) templates/base.html
+
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>EasyDesk — City Discoverer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+  <div class="container">
+    <a class="navbar-brand" href="/">EasyDesk</a>
+    <span class="navbar-text text-warning">50 Stately St, Suite 2, Wiley Ford WV 26767</span>
+  </div>
+</nav>
+<main class="container py-4">
+  {% block content %}{% endblock %}
+</main>
+<footer class="border-top py-3 text-center small text-muted">
+  © {{ 2025 }} City Discoverer · Opening Oct 1 — first week free with code EASYWEEK
+</footer>
+</body>
+</html>
+
+5) templates/index.html
+
+{% extends "base.html" %}
+{% block content %}
+<div class="row g-4">
+  <div class="col-lg-7">
+    <h1 class="mb-3">Work. Connect. Discover.</h1>
+    <p>Flexible desks + strong Wi-Fi on the border of Cumberland, MD & Wiley Ford, WV.</p>
+    <a class="btn btn-primary btn-lg" href="{{ url_for('book_page') }}">Book a desk</a>
+  </div>
+  <div class="col-lg-5">
+    <div class="card">
+      <div class="card-header">Today’s rates</div>
+      <ul class="list-group list-group-flush">
+        {% for r in resources %}
+        <li class="list-group-item d-flex justify-content-between">
+          <strong>{{ r.name }}</strong>
+          <span>${{ "%.2f"|format(r.hourly_rate_cents/100) }}/hr</span>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+6) templates/book.html
+
+{% extends "base.html" %}
+{% block content %}
+<h2>Reserve your spot</h2>
+<form method="post" action="/book" class="row g-3">
+  <div class="col-md-6">
+    <label class="form-label">Name</label>
+    <input required name="name" class="form-control">
+  </div>
+  <div class="col-md-6">
+    <label class="form-label">Email</label>
+    <input required name="email" type="email" class="form-control">
+  </div>
+
+  <div class="col-md-6">
+    <label class="form-label">Resource</label>
+    <select name="resource_id" class="form-select">
+      {% for r in resources %}
+      <option value="{{ r.id }}">{{ r.name }} — ${{ "%.2f"|format(r.hourly_rate_cents/100) }}/hr</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div class="col-md-3">
+    <label class="form-label">Date</label>
+    <input required type="date" name="date" class="form-control">
+  </div>
+  <div class="col-md-3">
+    <label class="form-label">Start time</label>
+    <input required type="time" name="start_time" value="09:00" class="form-control">
+  </div>
+
+  <div class="col-md-3">
+    <label class="form-label">Hours</label>
+    <input required type="number" name="hours" value="1" min="1" step="0.5" class="form-control">
+  </div>
+
+  <div class="col-12">
+    <button class="btn btn-primary btn-lg">Proceed to payment</button>
+    <a class="btn btn-outline-secondary" href="/">Cancel</a>
+  </div>
+</form>
+{% endblock %}
+
+7) templates/success.html
+
+{% extends "base.html" %}
+{% block content %}
+<div class="alert alert-success">
+  <h4 class="alert-heading">Payment received!</h4>
+  <p>Your booking is confirmed.</p>
+</div>
+<div class="card">
+  <div class="card-body">
+    <p><strong>Name:</strong> {{ booking.name }}</p>
+    <p><strong>Resource:</strong> {{ booking.resource.name }}</p>
+    <p><strong>When:</strong> {{ booking.start_dt }} → {{ booking.end_dt }} ({{ booking.hours }}h)</p>
+    <p><strong>Paid:</strong> {{ as_money(booking.amount_cents) }}</p>
+    <a class="btn btn-outline-dark" href="/qr/{{ booking.id }}">Download QR for check-in</a>
+    <a class="btn btn-primary" href="/">Back home</a>
+  </div>
+</div>
+{% endblock %}
+
+8) templates/cancel.html
+
+{% extends "base.html" %}
+{% block content %}
+<div class="alert alert-warning">
+  <strong>Payment canceled.</strong> Your reservation (ID {{ bid }}) wasn’t completed.
+</div>
+<a class="btn btn-primary" href="{{ url_for('book_page') }}">Try again</a>
+{% endblock %}
+
+
+⸻
+
+How to run (Replit)
+	1.	Create a new Python Repl, add the files above.
+	2.	Add Secrets from step 2 (.env).
+	3.	Install packages (pip install -r requirements.txt) if Replit doesn’t auto-install.
+	4.	Click Run. Copy the public URL and put it in your .env as BASE_URL.
+	5.	In Stripe dashboard, add a Webhook endpoint to https://YOUR-URL/stripe/webhook listening to checkout.session.completed and paste the signing secret into STRIPE_WEBHOOK_SECRET.
+
+⸻
+
+What you have
+	•	Landing page with rates
+	•	Booking form
+	•	Stripe Checkout payment
+	•	Success page + QR check-in
+	•	SQLite DB with seed resources
+
+From here you can add:
+	•	Admin dashboard, coupon code, calendar exports, email receipts, pay-on-arrival toggle, slot collision checks, and opening-hours rules.
+
+If you want me to add coupon EASYWEEK (100% off first booking) or the admin screens next, say the word and I’ll extend this starter.

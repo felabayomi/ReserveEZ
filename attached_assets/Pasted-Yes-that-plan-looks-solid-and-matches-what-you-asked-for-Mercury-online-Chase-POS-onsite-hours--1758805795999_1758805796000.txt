@@ -1,0 +1,55 @@
+Yes—that plan looks solid and matches what you asked for (Mercury online + Chase POS onsite, hours, capacity, passes, provider-agnostic payments). 🎯
+
+Here’s a quick go/no-go checklist before they build:
+
+Must-haves to confirm
+	•	DB migrations: capacity, opening_hours on resource; new pass + payment tables.
+	•	Payment layer: functions create_mercury_invoice(), mark_payment_paid(), active_pass(), seats_left(), is_in_hours().
+	•	Feature flags: USE_MERCURY=true, ALLOW_POS_CHECKOUT=true (Stripe fully disabled).
+	•	Webhooks: /webhook/mercury verifies signature and updates payment/booking/pass.
+	•	Admin: edit hours/capacity, list payments, “Mark Paid (Chase TXN ID)” button, passes tab.
+	•	UI: “Book by the hour” vs “Buy a Pass”, capacity badges, “Pass active until {date}”.
+
+ENV you’ll need (examples)
+
+MERCURY_API_KEY=...
+MERCURY_WEBHOOK_SECRET=...
+ALLOW_POS_CHECKOUT=true
+USE_MERCURY=true
+
+Minimal stubs they can drop in
+
+# payments.py (pseudo)
+def create_mercury_invoice(amount_cents, email, memo, metadata: dict) -> dict:
+    # call Mercury API to create payment link/invoice
+    # return {"intent_id": "...", "pay_url": "https://..."}
+    ...
+
+def verify_mercury_webhook(request) -> dict:
+    # verify with MERCURY_WEBHOOK_SECRET; return event dict
+    ...
+
+# app.py
+@app.post("/webhook/mercury")
+def mercury_webhook():
+    event = verify_mercury_webhook(request)
+    intent_id = event["data"]["id"]
+    status = event["data"]["status"]   # e.g., 'paid'
+    pay = Payment.query.filter_by(intent_id=intent_id, provider="mercury").first_or_404()
+    if status == "paid":
+        pay.status = "paid"
+        if pay.booking_id:
+            b = Booking.query.get(pay.booking_id); b.status = "paid"
+        if pay.pass_id:
+            p = Pass.query.get(pay.pass_id); p.status = "active"
+        db.session.commit()
+    return "ok"
+
+Smoke test plan (fast)
+	1.	Out-of-hours booking → blocked.
+	2.	Full capacity slot → blocked with “slot full.”
+	3.	Buy Day Pass (Mercury) → webhook sets pass active; next booking is free.
+	4.	Hourly booking (no pass) → Mercury link created; after webhook, booking = paid.
+	5.	Onsite payment → create booking → Admin enters Chase TXN ID → “Mark Paid” updates status.
+
+If you want, I can also draft the opening_hours JSON defaults for Mon–Sat and the validity windows for Day/Week/Month passes so they implement exactly what you intend.

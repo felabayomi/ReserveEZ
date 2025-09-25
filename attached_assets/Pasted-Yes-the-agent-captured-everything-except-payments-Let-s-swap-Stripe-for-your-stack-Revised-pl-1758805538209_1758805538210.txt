@@ -1,0 +1,120 @@
+Yes — the agent captured everything except payments. Let’s swap Stripe for your stack:
+
+✅ Revised plan (use this with Replit agent)
+
+Goal: Same features (hours, capacity, passes) but with
+	•	Mercury for online payments (invoices/links, ACH/card where supported)
+	•	Chase POS for onsite card payments (QuickAccept/terminal)
+
+1) Payment architecture
+
+Create a Payments layer so providers are swappable.
+
+DB: payment table
+	•	id PK
+	•	booking_id FK NULL (for hourly bookings)
+	•	pass_id FK NULL (for passes)
+	•	provider TEXT CHECK(mercury,chase,manual)
+	•	intent_id TEXT (Mercury invoice ID / Chase txn ID)
+	•	status TEXT CHECK(created,pending,paid,failed,refunded)
+	•	amount_cents INT
+	•	currency TEXT DEFAULT usd
+	•	created_at DATETIME
+
+2) Mercury (online)
+	•	Create Mercury Payment Link/Invoice for:
+a) hourly booking (if no active pass)
+b) pass purchase (Day/Week/Month)
+	•	Webhook endpoint /webhook/mercury to mark payment.paid and update booking.status='paid' or create/activate pass (with valid_from/valid_to).
+	•	If Mercury doesn’t provide webhooks in your plan, implement polling (cron every 2–5 min) or manual “Mark Paid” button in Admin.
+
+ENV
+
+MERCURY_API_KEY=...
+MERCURY_WEBHOOK_SECRET=...
+
+3) Chase POS (onsite)
+	•	Flow: Create booking → payment.status='pending' (provider='chase') → staff charges on Chase terminal/QuickAccept → enter/scan Chase TXN ID → Admin clicks “Mark Paid (Chase)” to reconcile.
+	•	Optional: If you have Chase API access, add /webhook/chase to auto-confirm by TXN ID.
+
+ENV
+
+CHASE_API_KEY=...        # if API access
+ALLOW_POS_CHECKOUT=true  # toggles onsite flow
+
+4) Passes (no Stripe)
+	•	Products: Day ($10), Week ($30), Month ($120) — created as Mercury invoices.
+	•	On Mercury paid, create Pass(email, pass_type, valid_from, valid_to, status='active').
+	•	Booking with an active pass → skip payment; set status='free'.
+
+5) Opening hours & capacity (unchanged)
+	•	Resource.capacity INT DEFAULT 10
+	•	Resource.opening_hours JSON (per weekday windows)
+	•	Validate in-hours + seats_left > 0 before booking.
+
+6) UI updates
+	•	/book shows:
+	•	Book by the hour OR Buy a Pass (Day/Week/Month)
+	•	Capacity badge: “Desks left: 7/10”
+	•	If email has active pass → banner: “Pass active until {date} — this booking is free.”
+	•	Payment screens:
+	•	Online → redirect to Mercury link
+	•	Onsite → show “Pay at desk (Chase POS). We’ll confirm and email receipt.”
+
+7) Admin
+	•	Edit capacity and opening hours per resource.
+	•	Payments tab: list Mercury/Chase transactions; Mark Paid button with TXN ID.
+	•	Passes tab: active passes (email, type, valid_to), manual expire.
+	•	Toggle: ALLOW_POS_CHECKOUT and “Require pass for free bookings”.
+
+8) Migrations (SQLite)
+
+ALTER TABLE resource ADD COLUMN capacity INTEGER DEFAULT 10;
+ALTER TABLE resource ADD COLUMN opening_hours TEXT;
+
+CREATE TABLE pass (
+  id INTEGER PRIMARY KEY,
+  email TEXT,
+  pass_type TEXT CHECK(pass_type IN ('day','week','month')),
+  purchase_dt DATETIME,
+  valid_from DATETIME,
+  valid_to DATETIME,
+  status TEXT CHECK(status IN ('active','expired','refunded')) DEFAULT 'active'
+);
+CREATE INDEX idx_pass_email ON pass(email);
+
+CREATE TABLE payment (
+  id INTEGER PRIMARY KEY,
+  booking_id INTEGER,
+  pass_id INTEGER,
+  provider TEXT,
+  intent_id TEXT,
+  status TEXT,
+  amount_cents INTEGER,
+  currency TEXT DEFAULT 'usd',
+  created_at DATETIME
+);
+
+9) Server helpers
+
+def is_in_hours(resource, start_dt, end_dt): ...
+def seats_left(resource_id, start_dt, end_dt): ...
+def active_pass(email, at_dt): ...
+def create_mercury_invoice(amount_cents, email, memo, metadata): ...
+def verify_mercury_webhook(request): ...
+def mark_payment_paid(provider, intent_id): ...
+
+10) Webhooks
+	•	POST /webhook/mercury → verify → match intent_id → set payment.status='paid' →
+	•	if booking: booking.status='paid'
+	•	if pass: pass.status='active', set validity windows
+
+(Keep your existing Stripe code disabled behind a feature flag if you want a fallback.)
+
+⸻
+
+Quick reply to agent
+
+Use Mercury for online payments (invoices/links + webhook) and Chase POS for onsite card payments. Implement a payment table and provider-agnostic payment layer. Replace Stripe flows with Mercury (for both bookings and passes). Onsite payments use Chase POS; we reconcile in Admin by entering the TXN ID (or via Chase webhook if possible). Everything else (hours/capacity/passes/UI/Admin) stays as spec.
+
+If you want, I can draft the Mercury invoice API stub and the /webhook/mercury Flask route you can paste in once your API key is ready.
