@@ -869,6 +869,52 @@ function selectPlan(planType) {
   }, 300);
 }
 
+function generateDeskIcons(resourceId, capacity, selectedSeats = 0) {
+  const availabilityData = getCurrentAvailability(resourceId);
+  let iconsHTML = '<div class="desk-visualization mb-3">';
+  iconsHTML += '<label class="form-label">Desk Availability:</label>';
+  iconsHTML += '<div class="desk-icons-container" id="desk-icons-' + resourceId + '">';
+  
+  for (let i = 1; i <= capacity; i++) {
+    const isBooked = availabilityData && availabilityData.bookedSeats >= i;
+    const isSelected = i <= selectedSeats;
+    const iconClass = isBooked ? 'desk-icon booked' : (isSelected ? 'desk-icon selected' : 'desk-icon available');
+    
+    iconsHTML += `<span class="${iconClass}" data-seat="${i}" title="Seat ${i}">
+      🪑${isBooked ? '❌' : (isSelected ? '✅' : '')}
+    </span>`;
+  }
+  
+  iconsHTML += '</div>';
+  iconsHTML += '<small class="text-muted">Available: 🪑 | Selected: 🪑✅ | Booked: 🪑❌</small>';
+  iconsHTML += '</div>';
+  
+  return iconsHTML;
+}
+
+function getCurrentAvailability(resourceId) {
+  // This would normally fetch from the API, for now return mock data
+  // In real implementation, you'd call the availability API
+  return { bookedSeats: 0 }; // Simplified for now
+}
+
+function updateDeskIcons(resourceId, selectedSeats) {
+  const resource = resourcesData[resourceId];
+  const container = document.getElementById('desk-icons-' + resourceId);
+  if (container) {
+    container.innerHTML = '';
+    
+    for (let i = 1; i <= resource.capacity; i++) {
+      const isSelected = i <= selectedSeats;
+      const iconClass = isSelected ? 'desk-icon selected' : 'desk-icon available';
+      
+      container.innerHTML += `<span class="${iconClass}" data-seat="${i}" title="Seat ${i}">
+        🪑${isSelected ? '✅' : ''}
+      </span>`;
+    }
+  }
+}
+
 function showBookingDetails() {
   if (!selectedResource || !selectedPlan) return;
   
@@ -882,6 +928,7 @@ function showBookingDetails() {
   
   if (selectedPlan === 'hour') {
     fieldsHTML = `
+      ${generateDeskIcons(selectedResource, resource.capacity, 1)}
       <div class="row g-3 mb-4">
         <div class="col-md-4">
           <label class="form-label">Date</label>
@@ -897,13 +944,14 @@ function showBookingDetails() {
         </div>
         <div class="col-md-6">
           <label class="form-label">Seats *</label>
-          <input required type="number" name="seats" value="1" min="1" max="${resource.capacity}" class="form-control" onchange="updateSummary()">
+          <input required type="number" name="seats" value="1" min="1" max="${resource.capacity}" class="form-control" onchange="updateSummary(); updateDeskIcons(${selectedResource}, this.value)">
           <div class="form-text">Max ${resource.capacity} seats available</div>
         </div>
       </div>
     `;
   } else if (selectedPlan === 'day') {
     fieldsHTML = `
+      ${generateDeskIcons(selectedResource, resource.capacity, 1)}
       <div class="row g-3 mb-4">
         <div class="col-md-6">
           <label class="form-label">Date *</label>
@@ -911,13 +959,14 @@ function showBookingDetails() {
         </div>
         <div class="col-md-6">
           <label class="form-label">Seats *</label>
-          <input required type="number" name="seats" value="1" min="1" max="${resource.capacity}" class="form-control" onchange="updateSummary()">
+          <input required type="number" name="seats" value="1" min="1" max="${resource.capacity}" class="form-control" onchange="updateSummary(); updateDeskIcons(${selectedResource}, this.value)">
           <div class="form-text">Max ${resource.capacity} seats available</div>
         </div>
       </div>
     `;
   } else if (selectedPlan === 'week') {
     fieldsHTML = `
+      ${generateDeskIcons(selectedResource, resource.capacity, 1)}
       <div class="row g-3 mb-4">
         <div class="col-md-6">
           <label class="form-label">Start date *</label>
@@ -926,13 +975,14 @@ function showBookingDetails() {
         </div>
         <div class="col-md-6">
           <label class="form-label">Seats *</label>
-          <input required type="number" name="seats" value="1" min="1" max="${resource.capacity}" class="form-control" onchange="updateSummary()">
+          <input required type="number" name="seats" value="1" min="1" max="${resource.capacity}" class="form-control" onchange="updateSummary(); updateDeskIcons(${selectedResource}, this.value)">
           <div class="form-text">Max ${resource.capacity} seats available</div>
         </div>
       </div>
     `;
   } else if (selectedPlan === 'month') {
     fieldsHTML = `
+      ${generateDeskIcons(selectedResource, resource.capacity, 1)}
       <div class="row g-3 mb-4">
         <div class="col-md-6">
           <label class="form-label">Start date *</label>
@@ -941,7 +991,7 @@ function showBookingDetails() {
         </div>
         <div class="col-md-6">
           <label class="form-label">Seats *</label>
-          <input required type="number" name="seats" value="1" min="1" max="${resource.capacity}" class="form-control" onchange="updateSummary()">
+          <input required type="number" name="seats" value="1" min="1" max="${resource.capacity}" class="form-control" onchange="updateSummary(); updateDeskIcons(${selectedResource}, this.value)">
           <div class="form-text">Max ${resource.capacity} seats available</div>
         </div>
       </div>
@@ -1227,6 +1277,57 @@ document.addEventListener('DOMContentLoaded', function() {
       height: 20px;
       border-radius: 4px;
       flex-shrink: 0;
+    }
+    
+    /* Desk Visualization Styles */
+    .desk-visualization {
+      background: #f8f9fa;
+      border: 1px solid #dee2e6;
+      border-radius: 8px;
+      padding: 15px;
+    }
+    
+    .desk-icons-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 10px 0;
+    }
+    
+    .desk-icon {
+      font-size: 24px;
+      padding: 8px;
+      border-radius: 6px;
+      border: 2px solid;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      position: relative;
+    }
+    
+    .desk-icon.available {
+      border-color: #28a745;
+      background: #d4edda;
+      color: #155724;
+    }
+    
+    .desk-icon.selected {
+      border-color: #007bff;
+      background: #cce7ff;
+      color: #004085;
+      transform: scale(1.1);
+    }
+    
+    .desk-icon.booked {
+      border-color: #dc3545;
+      background: #f8d7da;
+      color: #721c24;
+      opacity: 0.7;
+      text-decoration: line-through;
+    }
+    
+    .desk-icon:hover:not(.booked) {
+      transform: scale(1.15);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
     }
     
     /* Responsive adjustments */

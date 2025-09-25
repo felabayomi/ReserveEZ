@@ -31,10 +31,11 @@ Simplified calendar interface: Only today shown in olive green, all other dates 
 - **Webhook support**: Mercury webhook endpoint for automated payment confirmation
 
 ### Business Logic
-- **Capacity management**: Real-time seat availability checking with configurable limits per resource
+- **Capacity management**: Real-time seat availability checking with configurable limits per resource with visual desk icons
 - **Opening hours validation**: JSON-stored weekly schedules with day-specific time slots
 - **Pass system**: Three tiers (day/week/month) with automatic free booking privileges during validity
 - **Promotional codes**: First-booking discount system with email-based eligibility tracking
+- **Visual desk representation**: Interactive desk icons showing available/selected/booked status with real-time updates
 
 ### Authentication & Authorization
 - **Simple admin access**: Password-based admin panel for resource and booking management
