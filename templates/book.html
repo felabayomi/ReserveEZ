@@ -1,19 +1,60 @@
 {% extends "base.html" %}
 {% block content %}
 
-<div class="mb-3">
-  <a href="/" class="btn btn-outline-secondary btn-sm">
-    🏠 Home
-  </a>
+<!-- Navigation and Flow Indicator -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <a href="/" class="btn btn-outline-secondary btn-sm">
+      🏠 Home
+    </a>
+  </div>
+  <div class="text-end">
+    {% if flow_type == 'plan-first' %}
+      <small class="text-muted">Plan-First Booking</small>
+    {% else %}
+      <small class="text-muted">Workspace-First Booking</small>
+    {% endif %}
+  </div>
 </div>
 
-{% if pre_selected_plan %}
-<!-- Pre-selected plan flow: Resource selection directly -->
+<!-- Breadcrumb Navigation -->
+<nav aria-label="Booking flow breadcrumb">
+  <ol class="breadcrumb mb-4">
+    <li class="breadcrumb-item"><a href="/">Home</a></li>
+    {% if flow_type == 'plan-first' %}
+      <li class="breadcrumb-item">
+        <a href="/" data-bs-toggle="modal" data-bs-target="#planSelectionModal">Choose Plan</a>
+      </li>
+      <li class="breadcrumb-item active">
+        Select Workspace ({{ plan_display_names.get(pre_selected_plan, pre_selected_plan) }})
+      </li>
+      <li class="breadcrumb-item text-muted">Payment</li>
+    {% else %}
+      <li class="breadcrumb-item active">Select Workspace</li>
+      <li class="breadcrumb-item text-muted">Choose Plan & Payment</li>
+    {% endif %}
+  </ol>
+</nav>
+
+{% if flow_type == 'plan-first' and pre_selected_plan %}
+<!-- Plan-First Flow: Resource selection directly -->
 <div class="row mb-4">
   <div class="col-12">
-    <div class="alert alert-info">
-      <strong>{{ pre_selected_plan.title() }} booking selected</strong> — Choose your workspace below
-      <button class="btn btn-sm btn-outline-secondary ms-3" data-bs-toggle="modal" data-bs-target="#changePlanModal">← Change plan</button>
+    <div class="alert alert-success border-0" style="background: linear-gradient(135deg, #d4edda 0%, #f1fdf4 100%);">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <strong>✅ {{ plan_display_names.get(pre_selected_plan, pre_selected_plan) }} booking selected</strong>
+          <div class="small text-muted mt-1">Choose your workspace below</div>
+        </div>
+        <div>
+          <button class="btn btn-outline-secondary btn-sm" onclick="switchToWorkspaceFirst()">
+            ↔️ Switch to Workspace-First
+          </button>
+          <button class="btn btn-outline-primary btn-sm ms-2" data-bs-toggle="modal" data-bs-target="#changePlanModal">
+            ← Change Plan
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -73,7 +114,26 @@
 </div>
 
 {% else %}
-<!-- No plan selected: Show original modal flow -->
+
+<!-- Workspace-First Flow: workspace selection first -->
+<div class="row mb-4">
+  <div class="col-12">
+    <div class="alert alert-primary border-0" style="background: linear-gradient(135deg, #cce7ff 0%, #f1f9ff 100%);">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <strong>🎯 Workspace-First Booking</strong>
+          <div class="small text-muted mt-1">Compare all workspaces, then choose your plan</div>
+        </div>
+        <div>
+          <button class="btn btn-outline-secondary btn-sm" onclick="switchToPlanFirst()">
+            ↔️ Switch to Plan-First
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <h2>Reserve your workspace</h2>
 
 <!-- Date selection for availability -->
