@@ -199,6 +199,10 @@ def send_booking_confirmation_email(booking):
         # Prepare email content
         subject = f"Booking Confirmation - {booking.resource.name}"
         
+        # Check if this is an authorization hold booking
+        payment = Payment.query.filter_by(booking_id=booking.id).first()
+        is_auth_hold = payment and payment.provider == "stripe_auth" and payment.status == "authorized"
+        
         # Create HTML content with booking details
         html_content = f"""
         <html>
@@ -207,6 +211,19 @@ def send_booking_confirmation_email(booking):
                 <h2 style="color: #28a745; margin: 0;">Booking Confirmed!</h2>
                 <p style="margin: 10px 0 0 0;">Thank you for choosing EasyDesk at City Discoverer</p>
             </div>
+            
+            {f'''
+            <div style="background-color: #cce7ff; border: 1px solid #0066cc; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+                <h4 style="color: #0066cc; margin: 0 0 10px 0;">💳 Payment Authorization</h4>
+                <p style="margin: 0; font-size: 14px; color: #004080;">
+                    We've authorized <strong>{as_money(booking.amount_cents)}</strong> on your card to secure this reservation. 
+                    <strong>No charge has been made yet.</strong> You'll pay the full amount when you arrive at our desk.
+                </p>
+                <p style="margin: 10px 0 0 0; font-size: 13px; color: #0066cc;">
+                    The authorization will be released if you don't show up, or converted to a charge when you check in.
+                </p>
+            </div>
+            ''' if is_auth_hold else ''}
             
             <div style="background-color: #ffffff; border: 1px solid #dee2e6; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
                 <h3 style="color: #495057; margin-top: 0;">Booking Details</h3>
@@ -232,7 +249,7 @@ def send_booking_confirmation_email(booking):
                         <td style="padding: 8px 0;">{booking.seats}</td>
                     </tr>
                     <tr>
-                        <td style="padding: 8px 0; font-weight: bold; color: #6c757d;">Total:</td>
+                        <td style="padding: 8px 0; font-weight: bold; color: #6c757d;">Amount {'(Authorized)' if is_auth_hold else ''}:</td>
                         <td style="padding: 8px 0; font-weight: bold; color: #28a745;">{as_money(booking.amount_cents)}</td>
                     </tr>
                 </table>
@@ -243,6 +260,12 @@ def send_booking_confirmation_email(booking):
                     <strong>Location:</strong> City Discoverer<br>
                     50 Stately St, Suite 2, Wiley Ford WV 26767
                 </p>
+                {f'''
+                <p style="margin: 10px 0 0 0; font-size: 13px; color: #6c757d;">
+                    <strong>Payment Instructions:</strong> When you arrive, complete your payment at our front desk. 
+                    We accept cash, card, or mobile payments.
+                </p>
+                ''' if is_auth_hold else ''}
             </div>
             
             <div style="text-align: center; color: #6c757d; font-size: 12px; margin-top: 30px;">
