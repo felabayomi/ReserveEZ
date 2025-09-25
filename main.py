@@ -800,6 +800,237 @@ def check_and_send_pass_notifications():
         print(f"Error checking pass notifications: {str(e)}")
         return {"error": str(e)}
 
+def send_payment_failure_email(booking_or_pass, error_details=""):
+    """Send payment failure notification email"""
+    if not SENDGRID_API_KEY:
+        print("SendGrid API key not configured, skipping payment failure email")
+        return False
+    
+    try:
+        sg = SendGridAPIClient(SENDGRID_API_KEY)
+        
+        # Determine if it's a booking or pass
+        is_booking = hasattr(booking_or_pass, 'resource')
+        if is_booking:
+            email = booking_or_pass.email
+            item_name = booking_or_pass.resource.name
+            item_type = "booking"
+            amount = booking_or_pass.amount_cents
+        else:  # Pass
+            email = booking_or_pass.email
+            item_name = f"{booking_or_pass.pass_type.title()} Pass"
+            item_type = "pass"
+            # Get amount from payment record
+            payment = Payment.query.filter_by(pass_id=booking_or_pass.id).first()
+            amount = payment.amount_cents if payment else 0
+        
+        subject = f"Payment Issue - {item_name}"
+        
+        html_content = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="background-color: #dc3545; color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; text-align: center;">
+                <h2 style="margin: 0; font-size: 24px;">⚠️ Payment Issue</h2>
+                <p style="margin: 10px 0 0 0; font-size: 16px;">There was a problem processing your payment</p>
+            </div>
+            
+            <div style="background-color: #ffffff; border: 1px solid #dee2e6; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+                <h3 style="color: #495057; margin-top: 0;">{item_type.title()} Details</h3>
+                <table style="width: 100%; border-collapse: collapse;">
+                    <tr style="border-bottom: 1px solid #dee2e6;">
+                        <td style="padding: 8px 0; font-weight: bold; color: #6c757d;">{item_type.title()}:</td>
+                        <td style="padding: 8px 0;">{item_name}</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid #dee2e6;">
+                        <td style="padding: 8px 0; font-weight: bold; color: #6c757d;">Email:</td>
+                        <td style="padding: 8px 0;">{email}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 0; font-weight: bold; color: #6c757d;">Amount:</td>
+                        <td style="padding: 8px 0; color: #dc3545; font-weight: bold;">{as_money(amount)}</td>
+                    </tr>
+                </table>
+            </div>
+            
+            <div style="background-color: #f8d7da; border: 1px solid #f5c6cb; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <h4 style="margin: 0 0 10px 0; color: #721c24;">💳 What happened?</h4>
+                <p style="margin: 0; color: #721c24;">
+                    Your payment could not be processed. This might be due to insufficient funds, expired card, or payment method restrictions.
+                    {f' Error details: {error_details}' if error_details else ''}
+                </p>
+            </div>
+            
+            <div style="background-color: #d1ecf1; border: 1px solid #bee5eb; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <h4 style="margin: 0 0 10px 0; color: #0c5460;">🔧 Next Steps</h4>
+                <ul style="margin: 0; padding-left: 20px; color: #0c5460;">
+                    <li>Check your payment method is valid and has sufficient funds</li>
+                    <li>Try a different payment method</li>
+                    <li>Contact your bank if the issue persists</li>
+                    <li>Reply to this email for assistance</li>
+                </ul>
+            </div>
+            
+            <div style="text-align: center; margin: 20px 0;">
+                <a href="#" style="background-color: #28a745; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Try Payment Again</a>
+            </div>
+            
+            <div style="text-align: center; color: #6c757d; font-size: 12px; margin-top: 30px;">
+                <p>Need help? Reply to this email or contact us at hello@citydiscoverer.ai</p>
+            </div>
+        </body>
+        </html>
+        """
+        
+        # Send to customer
+        customer_message = Mail(
+            from_email=Email("billing@citydiscoverer.ai", "EasyDesk Booking System"),
+            to_emails=To(email),
+            subject=subject,
+            html_content=Content("text/html", html_content)
+        )
+        customer_message.reply_to = Email("hello@citydiscoverer.ai")
+        
+        # Send to admin
+        admin_subject = f"[ADMIN] Payment Failure - {item_name}"
+        admin_message = Mail(
+            from_email=Email("billing@citydiscoverer.ai", "EasyDesk Booking System"),
+            to_emails=To("hello@citydiscoverer.ai"),
+            subject=admin_subject,
+            html_content=Content("text/html", html_content)
+        )
+        admin_message.reply_to = Email("hello@citydiscoverer.ai")
+        
+        # Send both emails
+        customer_response = sg.send(customer_message)
+        admin_response = sg.send(admin_message)
+        
+        print(f"Payment failure email sent! Customer: {customer_response.status_code}, Admin: {admin_response.status_code}")
+        return True
+        
+    except Exception as e:
+        print(f"Failed to send payment failure email: {str(e)}")
+        return False
+
+def send_refund_confirmation_email(booking_or_pass, refund_amount_cents, refund_reason=""):
+    """Send refund confirmation email"""
+    if not SENDGRID_API_KEY:
+        print("SendGrid API key not configured, skipping refund confirmation email")
+        return False
+    
+    try:
+        sg = SendGridAPIClient(SENDGRID_API_KEY)
+        
+        # Determine if it's a booking or pass
+        is_booking = hasattr(booking_or_pass, 'resource')
+        if is_booking:
+            email = booking_or_pass.email
+            item_name = booking_or_pass.resource.name
+            item_type = "booking"
+            if hasattr(booking_or_pass, 'start_dt'):
+                item_details = f"on {booking_or_pass.start_dt.strftime('%B %d, %Y')}"
+            else:
+                item_details = ""
+        else:  # Pass
+            email = booking_or_pass.email
+            item_name = f"{booking_or_pass.pass_type.title()} Pass"
+            item_type = "pass"
+            item_details = f"valid until {booking_or_pass.valid_to.strftime('%B %d, %Y')}"
+        
+        subject = f"Refund Confirmed - {as_money(refund_amount_cents)} for {item_name}"
+        
+        html_content = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="background-color: #28a745; color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; text-align: center;">
+                <h2 style="margin: 0; font-size: 24px;">✅ Refund Processed</h2>
+                <p style="margin: 10px 0 0 0; font-size: 16px;">Your refund of {as_money(refund_amount_cents)} has been confirmed</p>
+            </div>
+            
+            <div style="background-color: #ffffff; border: 1px solid #dee2e6; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+                <h3 style="color: #495057; margin-top: 0;">Refund Details</h3>
+                <table style="width: 100%; border-collapse: collapse;">
+                    <tr style="border-bottom: 1px solid #dee2e6;">
+                        <td style="padding: 8px 0; font-weight: bold; color: #6c757d;">{item_type.title()}:</td>
+                        <td style="padding: 8px 0;">{item_name} {item_details}</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid #dee2e6;">
+                        <td style="padding: 8px 0; font-weight: bold; color: #6c757d;">Email:</td>
+                        <td style="padding: 8px 0;">{email}</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid #dee2e6;">
+                        <td style="padding: 8px 0; font-weight: bold; color: #6c757d;">Refund Amount:</td>
+                        <td style="padding: 8px 0; color: #28a745; font-weight: bold; font-size: 18px;">{as_money(refund_amount_cents)}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 0; font-weight: bold; color: #6c757d;">Refund Date:</td>
+                        <td style="padding: 8px 0;">{dt.datetime.utcnow().strftime('%B %d, %Y at %I:%M %p')}</td>
+                    </tr>
+                </table>
+            </div>
+            
+            {f'''<div style="background-color: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <h4 style="margin: 0 0 10px 0; color: #856404;">📝 Refund Reason</h4>
+                <p style="margin: 0; color: #856404;">{refund_reason}</p>
+            </div>''' if refund_reason else ''}
+            
+            <div style="background-color: #d4edda; border: 1px solid #c3e6cb; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <h4 style="margin: 0 0 10px 0; color: #155724;">💳 Payment Information</h4>
+                <ul style="margin: 0; padding-left: 20px; color: #155724;">
+                    <li>Refund will appear on your original payment method</li>
+                    <li>Processing time: 3-5 business days</li>
+                    <li>You will receive a separate notification from your bank/card issuer</li>
+                    <li>Questions? Contact us anytime</li>
+                </ul>
+            </div>
+            
+            <div style="background-color: #e9ecef; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <p style="margin: 0; font-size: 14px; color: #6c757d;">
+                    <strong>Still need workspace?</strong><br>
+                    City Discoverer - 50 Stately St, Suite 2, Wiley Ford WV 26767
+                </p>
+            </div>
+            
+            <div style="text-align: center; margin: 20px 0;">
+                <a href="#" style="background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Book Again</a>
+            </div>
+            
+            <div style="text-align: center; color: #6c757d; font-size: 12px; margin-top: 30px;">
+                <p>Questions about your refund? Reply to this email or contact us at hello@citydiscoverer.ai</p>
+            </div>
+        </body>
+        </html>
+        """
+        
+        # Send to customer
+        customer_message = Mail(
+            from_email=Email("billing@citydiscoverer.ai", "EasyDesk Booking System"),
+            to_emails=To(email),
+            subject=subject,
+            html_content=Content("text/html", html_content)
+        )
+        customer_message.reply_to = Email("hello@citydiscoverer.ai")
+        
+        # Send to admin
+        admin_subject = f"[ADMIN] Refund Processed - {as_money(refund_amount_cents)} for {item_name}"
+        admin_message = Mail(
+            from_email=Email("billing@citydiscoverer.ai", "EasyDesk Booking System"),
+            to_emails=To("hello@citydiscoverer.ai"),
+            subject=admin_subject,
+            html_content=Content("text/html", html_content)
+        )
+        admin_message.reply_to = Email("hello@citydiscoverer.ai")
+        
+        # Send both emails
+        customer_response = sg.send(customer_message)
+        admin_response = sg.send(admin_message)
+        
+        print(f"Refund confirmation email sent! Customer: {customer_response.status_code}, Admin: {admin_response.status_code}")
+        return True
+        
+    except Exception as e:
+        print(f"Failed to send refund confirmation email: {str(e)}")
+        return False
+
 def user_has_used_promo(email: str, code: str) -> bool:
     return Booking.query.filter(
         Booking.email == email,
