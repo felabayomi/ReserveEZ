@@ -1277,6 +1277,277 @@ def send_booking_modification_email(booking, original_booking_data, modification
         print(f"Failed to send booking modification email: {str(e)}")
         return False
 
+def send_welcome_email(email, customer_name=""):
+    """Send welcome email to new customers"""
+    if not SENDGRID_API_KEY:
+        print("SendGrid API key not configured, skipping welcome email")
+        return False
+    
+    try:
+        sg = SendGridAPIClient(SENDGRID_API_KEY)
+        
+        name_display = customer_name if customer_name else "there"
+        subject = f"Welcome to City Discoverer EasyDesk! 🎉"
+        
+        html_content = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="background-color: #6f42c1; color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; text-align: center;">
+                <h2 style="margin: 0; font-size: 24px;">🎉 Welcome to EasyDesk!</h2>
+                <p style="margin: 10px 0 0 0; font-size: 16px;">We're excited to have you join our coworking community</p>
+            </div>
+            
+            <div style="background-color: #ffffff; border: 1px solid #dee2e6; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+                <h3 style="color: #495057; margin-top: 0;">Hi {name_display}! 👋</h3>
+                <p style="margin: 0 0 15px 0; line-height: 1.6;">
+                    Thank you for choosing City Discoverer's EasyDesk booking system! We're thrilled to welcome you to our flexible workspace community.
+                </p>
+                <p style="margin: 0; line-height: 1.6;">
+                    Whether you're a remote worker, entrepreneur, student, or just need a change of scenery, our workspace is designed to help you be productive and comfortable.
+                </p>
+            </div>
+            
+            <div style="background-color: #e7f3ff; border: 1px solid #bee5eb; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <h4 style="margin: 0 0 10px 0; color: #0c5460;">🏢 About Our Space</h4>
+                <ul style="margin: 0; padding-left: 20px; color: #0c5460;">
+                    <li>Professional workspace with high-speed WiFi</li>
+                    <li>Comfortable seating and work stations</li>
+                    <li>Quiet environment perfect for focus</li>
+                    <li>Meeting rooms and collaboration spaces</li>
+                </ul>
+            </div>
+            
+            <div style="background-color: #d4edda; border: 1px solid #c3e6cb; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <h4 style="margin: 0 0 10px 0; color: #155724;">🚀 Getting Started</h4>
+                <ul style="margin: 0; padding-left: 20px; color: #155724;">
+                    <li>Book by the hour or purchase a day/week/month pass</li>
+                    <li>Use promo code <strong>EASYWEEK</strong> for 100% off your first booking!</li>
+                    <li>Passes give unlimited bookings during valid periods</li>
+                    <li>Cancel and reschedule easily within our system</li>
+                </ul>
+            </div>
+            
+            <div style="background-color: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <h4 style="margin: 0 0 10px 0; color: #856404;">📍 Location & Hours</h4>
+                <p style="margin: 0; color: #856404;">
+                    <strong>City Discoverer</strong><br>
+                    50 Stately St, Suite 2<br>
+                    Wiley Ford, WV 26767<br><br>
+                    <strong>Hours:</strong> Monday - Friday, 9 AM - 5 PM<br>
+                    <strong>Weekend hours:</strong> Available by appointment
+                </p>
+            </div>
+            
+            <div style="background-color: #f8f9fa; border: 1px solid #dee2e6; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <h4 style="margin: 0 0 10px 0; color: #495057;">💡 Pro Tips</h4>
+                <ul style="margin: 0; padding-left: 20px; color: #495057;">
+                    <li>Book in advance for peak times (mornings and mid-week)</li>
+                    <li>Bring headphones for calls and video conferences</li>
+                    <li>Check in with us when you arrive for the best experience</li>
+                    <li>Join our community for networking opportunities</li>
+                </ul>
+            </div>
+            
+            <div style="text-align: center; margin: 20px 0;">
+                <a href="#" style="background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-right: 10px;">Book Your First Session</a>
+                <a href="#" style="background-color: #28a745; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Explore Passes</a>
+            </div>
+            
+            <div style="text-align: center; color: #6c757d; font-size: 12px; margin-top: 30px;">
+                <p>Questions or need help getting started? Reply to this email or contact us at hello@citydiscoverer.ai<br>
+                We're here to help make your workspace experience amazing!</p>
+            </div>
+        </body>
+        </html>
+        """
+        
+        # Send to customer
+        customer_message = Mail(
+            from_email=Email("hello@citydiscoverer.ai", "City Discoverer Team"),
+            to_emails=To(email),
+            subject=subject,
+            html_content=Content("text/html", html_content)
+        )
+        customer_message.reply_to = Email("hello@citydiscoverer.ai")
+        
+        # Send copy to admin
+        admin_subject = f"[ADMIN] Welcome Email Sent - {email}"
+        admin_message = Mail(
+            from_email=Email("hello@citydiscoverer.ai", "City Discoverer Team"),
+            to_emails=To("hello@citydiscoverer.ai"),
+            subject=admin_subject,
+            html_content=Content("text/html", html_content)
+        )
+        admin_message.reply_to = Email("hello@citydiscoverer.ai")
+        
+        # Send both emails
+        customer_response = sg.send(customer_message)
+        admin_response = sg.send(admin_message)
+        
+        print(f"Welcome email sent! Customer: {customer_response.status_code}, Admin: {admin_response.status_code}")
+        return True
+        
+    except Exception as e:
+        print(f"Failed to send welcome email: {str(e)}")
+        return False
+
+def send_daily_summary_email(date_str=""):
+    """Send daily booking summary email to admin"""
+    if not SENDGRID_API_KEY:
+        print("SendGrid API key not configured, skipping daily summary email")
+        return False
+    
+    try:
+        sg = SendGridAPIClient(SENDGRID_API_KEY)
+        
+        # Use provided date or today
+        if date_str:
+            target_date = dt.datetime.strptime(date_str, "%Y-%m-%d").date()
+        else:
+            target_date = dt.date.today()
+        
+        # Get bookings for the day
+        start_of_day = dt.datetime.combine(target_date, dt.time.min)
+        end_of_day = dt.datetime.combine(target_date, dt.time.max)
+        
+        bookings = Booking.query.filter(
+            Booking.start_dt.between(start_of_day, end_of_day)
+        ).all()
+        
+        # Get pass purchases for the day
+        passes = Pass.query.filter(
+            Pass.purchase_dt.between(start_of_day, end_of_day)
+        ).all()
+        
+        # Calculate totals
+        total_bookings = len(bookings)
+        total_revenue_cents = sum(b.amount_cents for b in bookings)
+        total_passes = len(passes)
+        pass_revenue_cents = sum((p.pass_type == "day" and 2000) or (p.pass_type == "week" and 10000) or 15000 for p in passes)
+        
+        subject = f"Daily Summary - {target_date.strftime('%B %d, %Y')}"
+        
+        # Create booking rows HTML
+        booking_rows = ""
+        for booking in bookings:
+            status_color = {"confirmed": "#28a745", "cancelled": "#dc3545", "completed": "#6c757d"}.get(booking.status, "#17a2b8")
+            booking_rows += f"""
+            <tr style="border-bottom: 1px solid #dee2e6;">
+                <td style="padding: 8px; font-size: 14px;">{booking.start_dt.strftime('%I:%M %p')}</td>
+                <td style="padding: 8px; font-size: 14px;">{booking.resource.name}</td>
+                <td style="padding: 8px; font-size: 14px;">{booking.email}</td>
+                <td style="padding: 8px; font-size: 14px;">{booking.duration_hours}h</td>
+                <td style="padding: 8px; font-size: 14px; color: {status_color}; font-weight: bold;">{booking.status.upper()}</td>
+                <td style="padding: 8px; font-size: 14px; font-weight: bold;">{as_money(booking.amount_cents)}</td>
+            </tr>
+            """
+        
+        if not booking_rows:
+            booking_rows = '<tr><td colspan="6" style="padding: 15px; text-align: center; color: #6c757d; font-style: italic;">No bookings today</td></tr>'
+        
+        # Create pass rows HTML
+        pass_rows = ""
+        for pass_obj in passes:
+            pass_rows += f"""
+            <tr style="border-bottom: 1px solid #dee2e6;">
+                <td style="padding: 8px; font-size: 14px;">{pass_obj.purchase_dt.strftime('%I:%M %p')}</td>
+                <td style="padding: 8px; font-size: 14px;">{pass_obj.pass_type.title()} Pass</td>
+                <td style="padding: 8px; font-size: 14px;">{pass_obj.email}</td>
+                <td style="padding: 8px; font-size: 14px;">{pass_obj.valid_to.strftime('%m/%d')}</td>
+                <td style="padding: 8px; font-size: 14px; color: #28a745; font-weight: bold;">{pass_obj.status.upper()}</td>
+            </tr>
+            """
+        
+        if not pass_rows:
+            pass_rows = '<tr><td colspan="5" style="padding: 15px; text-align: center; color: #6c757d; font-style: italic;">No passes purchased today</td></tr>'
+        
+        html_content = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; padding: 20px;">
+            <div style="background-color: #495057; color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; text-align: center;">
+                <h2 style="margin: 0; font-size: 24px;">📊 Daily Summary</h2>
+                <p style="margin: 10px 0 0 0; font-size: 16px;">{target_date.strftime('%A, %B %d, %Y')}</p>
+            </div>
+            
+            <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                <div style="flex: 1; background-color: #d4edda; border: 1px solid #c3e6cb; padding: 15px; border-radius: 8px; text-align: center;">
+                    <h4 style="margin: 0 0 5px 0; color: #155724;">Total Bookings</h4>
+                    <div style="font-size: 24px; font-weight: bold; color: #155724;">{total_bookings}</div>
+                </div>
+                <div style="flex: 1; background-color: #cff4fc; border: 1px solid #b6effb; padding: 15px; border-radius: 8px; text-align: center;">
+                    <h4 style="margin: 0 0 5px 0; color: #055160;">Passes Sold</h4>
+                    <div style="font-size: 24px; font-weight: bold; color: #055160;">{total_passes}</div>
+                </div>
+                <div style="flex: 1; background-color: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 8px; text-align: center;">
+                    <h4 style="margin: 0 0 5px 0; color: #856404;">Total Revenue</h4>
+                    <div style="font-size: 20px; font-weight: bold; color: #856404;">{as_money(total_revenue_cents + pass_revenue_cents)}</div>
+                </div>
+            </div>
+            
+            <div style="background-color: #ffffff; border: 1px solid #dee2e6; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+                <h3 style="color: #495057; margin-top: 0;">📅 Today's Bookings</h3>
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead style="background-color: #f8f9fa;">
+                        <tr>
+                            <th style="padding: 10px 8px; text-align: left; font-size: 14px; color: #495057;">Time</th>
+                            <th style="padding: 10px 8px; text-align: left; font-size: 14px; color: #495057;">Workspace</th>
+                            <th style="padding: 10px 8px; text-align: left; font-size: 14px; color: #495057;">Customer</th>
+                            <th style="padding: 10px 8px; text-align: left; font-size: 14px; color: #495057;">Duration</th>
+                            <th style="padding: 10px 8px; text-align: left; font-size: 14px; color: #495057;">Status</th>
+                            <th style="padding: 10px 8px; text-align: left; font-size: 14px; color: #495057;">Revenue</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {booking_rows}
+                    </tbody>
+                </table>
+            </div>
+            
+            <div style="background-color: #ffffff; border: 1px solid #dee2e6; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+                <h3 style="color: #495057; margin-top: 0;">🎫 Today's Pass Sales</h3>
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead style="background-color: #f8f9fa;">
+                        <tr>
+                            <th style="padding: 10px 8px; text-align: left; font-size: 14px; color: #495057;">Time</th>
+                            <th style="padding: 10px 8px; text-align: left; font-size: 14px; color: #495057;">Pass Type</th>
+                            <th style="padding: 10px 8px; text-align: left; font-size: 14px; color: #495057;">Customer</th>
+                            <th style="padding: 10px 8px; text-align: left; font-size: 14px; color: #495057;">Expires</th>
+                            <th style="padding: 10px 8px; text-align: left; font-size: 14px; color: #495057;">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {pass_rows}
+                    </tbody>
+                </table>
+            </div>
+            
+            <div style="text-align: center; color: #6c757d; font-size: 12px; margin-top: 30px;">
+                <p>Generated at {dt.datetime.utcnow().strftime('%B %d, %Y at %I:%M %p')} UTC<br>
+                EasyDesk Booking System - City Discoverer</p>
+            </div>
+        </body>
+        </html>
+        """
+        
+        # Send to admin only
+        admin_message = Mail(
+            from_email=Email("billing@citydiscoverer.ai", "EasyDesk System"),
+            to_emails=To("hello@citydiscoverer.ai"),
+            subject=subject,
+            html_content=Content("text/html", html_content)
+        )
+        admin_message.reply_to = Email("hello@citydiscoverer.ai")
+        
+        # Send admin email
+        admin_response = sg.send(admin_message)
+        
+        print(f"Daily summary email sent! Admin: {admin_response.status_code}")
+        return True
+        
+    except Exception as e:
+        print(f"Failed to send daily summary email: {str(e)}")
+        return False
+
 def user_has_used_promo(email: str, code: str) -> bool:
     return Booking.query.filter(
         Booking.email == email,
