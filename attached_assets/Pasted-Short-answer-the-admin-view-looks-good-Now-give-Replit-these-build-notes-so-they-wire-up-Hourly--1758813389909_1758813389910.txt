@@ -1,0 +1,135 @@
+Short answer: the admin view looks good. Now give Replit these build notes so they wire up Hourly / Day / Week / Month passes, pricing, and bullet-proof calendar syncing (no double-booking).
+
+⸻
+
+EasyDesk – booking UX + logic (send to Replit)
+
+0) Resources you already have
+	•	Hot Desk (cap 2), Meeting Lounge (cap 4), Quiet Desk (cap 1), Whole Room (cap 1).
+	•	Keep capacity on each resource and opening_hours JSON.
+
+1) UI flow
+
+Entry point: “Book Desk”
+	1.	Modal Step 1: Choose resource (Hot Desk / Quiet Desk / Meeting Lounge / Whole Room).
+	2.	Modal Step 2: Choose plan → Hourly | Day Pass | Week Pass | Month Pass.
+	3.	Modal Step 3: Plan-specific form (see below).
+	4.	Availability check → price summary → pay (Mercury) or mark POS (Chase) → success.
+	5.	On success, create booking(s) and block the calendar.
+
+Forms per plan
+	•	Hourly
+	•	Date
+	•	Start time, End time (respect opening hours)
+	•	Seats (<= capacity)
+	•	Day Pass
+	•	Date (single day)
+	•	Seats (<= capacity)
+	•	If resource has business hours, booking blocks that day within hours.
+	•	Week Pass
+	•	Start date (blocks 7 consecutive days within business hours)
+	•	Seats (<= capacity)
+	•	Month Pass
+	•	Start date (blocks 30 consecutive days within business hours)
+	•	Seats (<= capacity)
+
+Important: For Week/Month, we are reserving the same specific desk/room for the duration. That means capacity for that resource is reduced for all overlapping hours in that period.
+
+2) Pricing (recommendations you can seed, editable in admin)
+
+Use clean ratios so it’s easy to understand and discount longer terms. Suggested starting grid:
+
+Resource	Hourly	Day Pass	Week Pass	Month Pass
+Hot Desk	$5	$15	$60	$150
+Quiet Desk	$17	$30	$110	$275
+Meeting Lng (2–4)	$15	$60	$200	$500
+Whole Room	$50	$175	$600	$1,500
+
+Rules of thumb baked in:
+	•	Day ≈ 3–4× hourly
+	•	Week ≈ 4× day
+	•	Month ≈ 2.5–3× week
+Expose these in Admin so we can tweak later.
+
+3) Data model (SQL/ORM)
+
+resources
+	•	id, name, slug, capacity INT, rate_hour_cents, rate_day_cents, rate_week_cents, rate_month_cents
+	•	opening_hours JSON (e.g., { "Mon": [["09:00","17:00"]], ... })
+	•	active BOOL
+
+bookings
+	•	id, resource_id, plan_type ENUM(‘hour’,‘day’,‘week’,‘month’)
+	•	seats INT
+	•	start_dt (UTC), end_dt (UTC)  ← entire effective window
+	•	customer_name, customer_email
+	•	status ENUM(‘pending’,‘paid’,‘cancelled’)
+	•	payment_id NULLABLE, pass_id NULLABLE
+	•	created_at
+
+passes (if you keep them)
+	•	id, customer_email, resource_id NULLABLE (if “any desk” later), pass_type ENUM(‘day’,‘week’,‘month’)
+	•	valid_from_dt, valid_to_dt, status ENUM(‘active’,‘used’,‘expired’), payment_id
+	•	seats INT DEFAULT 1
+
+payments
+	•	id, provider ENUM(‘mercury’,‘chase’,‘manual’), amount_cents, status ENUM(‘pending’,‘paid’,‘failed’,‘refunded’), intent_id, notes
+
+4) Availability engine (no conflicts)
+
+A booking is allowed only if seats_requested ≤ seats_available for every hour in the requested window.
+
+-- seats already booked for a resource during a given window:
+SELECT COALESCE(SUM(seats), 0) AS booked
+FROM bookings
+WHERE resource_id = :rid
+  AND status IN ('pending','paid')
+  AND NOT (end_dt <= :new_start OR start_dt >= :new_end);
+
+Seats available = resource.capacity - booked. Must be ≥ seats_requested.
+
+Hourly: start_dt = selected date+time; end_dt = same date + hours.
+Day/Week/Month:
+	•	Create one continuous booking per pass: start_dt = start date 09:00, end_dt = end date 17:00 (or whatever opening hours JSON defines daily).
+	•	For availability, check every open hour in the range; if any hour would exceed capacity, block with a clear message.
+
+Edge cases
+	•	Validate against opening_hours (reject out-of-hours)
+	•	Enforce timezone (store UTC, display local ET)
+	•	Atomicity: on payment webhook success, finalize booking; if payment fails/timeout, auto-cancel pending holds (e.g., after 15 minutes).
+
+5) Calendar sync
+	•	Generate an ICS feed per resource (read-only).
+	•	Admin page: mini calendar with colored blocks for each plan type (Hour/Day/Week/Month).
+	•	Each booking creates one event spanning its start_dt→end_dt.
+
+6) Payments
+	•	Keep provider-agnostic layer:
+	•	Online: Mercury invoice/link; webhook /webhook/mercury marks payment.status='paid' then booking.status='paid'.
+	•	Onsite: Chase POS → Admin enters TXN ID → mark paid.
+	•	If customer has an active pass covering the range, skip payment and attach pass_id.
+
+7) Admin
+	•	CRUD resources (capacity, all four rates, opening hours)
+	•	View capacity status now/next 7 days
+	•	List bookings; filter by resource, status, plan_type
+	•	Manually “Mark Paid (Chase TXN)”
+	•	Manage passes (activate/expire)
+	•	Settings: default business hours, timezone, hold-timeout for pending bookings
+
+8) Copy/text you can drop in UI
+	•	Modal title step 2: “How long do you need the space?”
+	•	Availability error: “That resource is fully booked during part of your requested time. Try fewer seats or different hours.”
+	•	Success: “Reserved! A confirmation and calendar link have been emailed.”
+
+⸻
+
+TL;DR for Replit agent
+	•	Add plan selector modal (Hourly/Day/Week/Month) with plan-specific forms.
+	•	Implement overlap + capacity checks for entire requested range.
+	•	On success, create a single continuous booking (spanning business hours for Day/Week/Month).
+	•	Block calendar accordingly; expose ICS per resource.
+	•	Payments via Mercury online, Chase POS manual.
+	•	Seed pricing with the table above; make editable in Admin.
+
+If you need me to provide sample opening_hours JSON and test cases, I can drop those in too.

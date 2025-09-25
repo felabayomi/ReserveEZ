@@ -28,6 +28,9 @@ class Resource(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120), nullable=False)
     hourly_rate_cents = db.Column(db.Integer, nullable=False)
+    day_rate_cents = db.Column(db.Integer, nullable=False, default=0)
+    week_rate_cents = db.Column(db.Integer, nullable=False, default=0)
+    month_rate_cents = db.Column(db.Integer, nullable=False, default=0)
     capacity = db.Column(db.Integer, default=10)
     opening_hours = db.Column(db.Text)  # JSON string
     active = db.Column(db.Boolean, default=True)
@@ -77,59 +80,87 @@ class Booking(db.Model):
     email = db.Column(db.String(200), nullable=False, index=True)
     name = db.Column(db.String(120))
     resource_id = db.Column(db.Integer, db.ForeignKey("resource.id"), nullable=False)
+    plan_type = db.Column(db.String(10), nullable=False, default="hour")  # hour, day, week, month
+    seats = db.Column(db.Integer, default=1)
     start_dt = db.Column(db.DateTime, nullable=False)
     end_dt = db.Column(db.DateTime, nullable=False)
     hours = db.Column(db.Float, nullable=False)
     amount_cents = db.Column(db.Integer, nullable=False)
     status = db.Column(db.String(20), default="reserved")  # reserved, paid, cancelled, checked_in, free
     promo_applied = db.Column(db.String(40))
+    pass_id = db.Column(db.Integer, db.ForeignKey("pass.id"), nullable=True)
     created_at = db.Column(db.DateTime, default=dt.datetime.utcnow)
 
     resource = db.relationship("Resource")
 
 # ---------------- Database Setup ----------------
-with app.app_context():
-    db.create_all()
-    if Resource.query.count() == 0:
-        default_hours = {
-            "mon": [["09:00", "18:00"]],
-            "tue": [["09:00", "18:00"]],
-            "wed": [["09:00", "18:00"]],
-            "thu": [["09:00", "18:00"]],
-            "fri": [["09:00", "18:00"]],
-            "sat": [["10:00", "14:00"]],
-            "sun": []
-        }
-        resources = []
-        hot_desk = Resource()
-        hot_desk.name = "Hot Desk"
-        hot_desk.hourly_rate_cents = 600
-        hot_desk.capacity = 8
-        hot_desk.opening_hours = json.dumps(default_hours)
-        resources.append(hot_desk)
+def initialize_database():
+    """Initialize database with proper error handling"""
+    with app.app_context():
+        # Force drop and recreate all tables for schema changes
+        db.drop_all()
+        db.create_all()
         
-        quiet_desk = Resource()
-        quiet_desk.name = "Quiet Desk"
-        quiet_desk.hourly_rate_cents = 700
-        quiet_desk.capacity = 6
-        quiet_desk.opening_hours = json.dumps(default_hours)
-        resources.append(quiet_desk)
+        # Check if we need to seed data
+        if Resource.query.count() == 0:
+            default_hours = {
+                "mon": [["09:00", "18:00"]],
+                "tue": [["09:00", "18:00"]],
+                "wed": [["09:00", "18:00"]],
+                "thu": [["09:00", "18:00"]],
+                "fri": [["09:00", "18:00"]],
+                "sat": [["10:00", "14:00"]],
+                "sun": []
+            }
+            resources = []
+            # Hot Desk: $5 hourly, $15 day, $60 week, $150 month, capacity 2
+            hot_desk = Resource()
+            hot_desk.name = "Hot Desk"
+            hot_desk.hourly_rate_cents = 500
+            hot_desk.day_rate_cents = 1500
+            hot_desk.week_rate_cents = 6000
+            hot_desk.month_rate_cents = 15000
+            hot_desk.capacity = 2
+            hot_desk.opening_hours = json.dumps(default_hours)
+            resources.append(hot_desk)
         
-        meeting_table = Resource()
-        meeting_table.name = "Meeting Table (2–4)"
-        meeting_table.hourly_rate_cents = 1200
-        meeting_table.capacity = 4
-        meeting_table.opening_hours = json.dumps(default_hours)
-        resources.append(meeting_table)
+            # Quiet Desk: $17 hourly, $30 day, $110 week, $275 month, capacity 1
+            quiet_desk = Resource()
+            quiet_desk.name = "Quiet Desk"
+            quiet_desk.hourly_rate_cents = 1700
+            quiet_desk.day_rate_cents = 3000
+            quiet_desk.week_rate_cents = 11000
+            quiet_desk.month_rate_cents = 27500
+            quiet_desk.capacity = 1
+            quiet_desk.opening_hours = json.dumps(default_hours)
+            resources.append(quiet_desk)
         
-        whole_room = Resource()
-        whole_room.name = "Whole Room"
-        whole_room.hourly_rate_cents = 2000
-        whole_room.capacity = 1
-        whole_room.opening_hours = json.dumps(default_hours)
-        resources.append(whole_room)
-        db.session.add_all(resources)
-        db.session.commit()
+            # Meeting Lounge: $15 hourly, $60 day, $200 week, $500 month, capacity 4
+            meeting_table = Resource()
+            meeting_table.name = "Meeting Lounge"
+            meeting_table.hourly_rate_cents = 1500
+            meeting_table.day_rate_cents = 6000
+            meeting_table.week_rate_cents = 20000
+            meeting_table.month_rate_cents = 50000
+            meeting_table.capacity = 4
+            meeting_table.opening_hours = json.dumps(default_hours)
+            resources.append(meeting_table)
+        
+            # Whole Room: $50 hourly, $175 day, $600 week, $1500 month, capacity 1
+            whole_room = Resource()
+            whole_room.name = "Whole Room"
+            whole_room.hourly_rate_cents = 5000
+            whole_room.day_rate_cents = 17500
+            whole_room.week_rate_cents = 60000
+            whole_room.month_rate_cents = 150000
+            whole_room.capacity = 1
+            whole_room.opening_hours = json.dumps(default_hours)
+            resources.append(whole_room)
+            db.session.add_all(resources)
+            db.session.commit()
+
+# Initialize database on startup
+initialize_database()
 
 # ---------------- Helper Functions ----------------
 def parse_dt(date_str, time_str):
@@ -171,14 +202,15 @@ def seats_left(resource_id, start_dt, end_dt):
     if not resource:
         return 0
     
-    used = Booking.query.filter(
+    # Sum up actual seats booked (not just count of bookings)
+    used_seats = db.session.query(db.func.coalesce(db.func.sum(Booking.seats), 0)).filter(
         Booking.resource_id == resource_id,
         Booking.status.in_(["reserved", "paid", "checked_in", "free"]),
         Booking.start_dt < end_dt,
         Booking.end_dt > start_dt
-    ).count()
+    ).scalar() or 0
     
-    return max(0, resource.capacity - used)
+    return max(0, resource.capacity - used_seats)
 
 def active_pass(email, at_dt):
     """Check for active pass for user at given datetime"""
@@ -205,6 +237,80 @@ def day_bookings(date_str):
     for b in bookings:
         grouped.setdefault(b.resource_id, []).append(b)
     return grouped
+
+def validate_booking_availability(resource_id, plan_type, seats, start_dt, end_dt=None, hours=None):
+    """Validate if a booking can be made with comprehensive availability checking"""
+    resource = Resource.query.get(resource_id)
+    if not resource or not resource.active:
+        return False, "Resource not available"
+    
+    # Calculate end_dt if not provided
+    if not end_dt:
+        end_dt = calculate_plan_duration(resource, plan_type, start_dt, hours)
+    
+    # Check if requested seats exceed capacity
+    if seats > resource.capacity:
+        return False, f"Requested {seats} seats exceeds capacity of {resource.capacity}"
+    
+    # Check opening hours for the entire duration
+    if not is_booking_within_hours(resource, start_dt, end_dt):
+        return False, "Booking time is outside opening hours"
+    
+    # Check availability for the entire time window
+    available_seats = seats_left(resource_id, start_dt, end_dt)
+    if available_seats < seats:
+        return False, f"Only {available_seats} seats available, but {seats} requested"
+    
+    return True, "Available"
+
+def is_booking_within_hours(resource, start_dt, end_dt):
+    """Check if entire booking duration falls within opening hours"""
+    hours_data = resource.get_opening_hours()
+    
+    # Check each day in the booking range
+    current = start_dt.date()
+    end_date = end_dt.date()
+    
+    while current <= end_date:
+        day_key = current.strftime("%a").lower()
+        
+        if day_key not in hours_data or not hours_data[day_key]:
+            # Closed on this day
+            if current == start_dt.date() or current == end_dt.date():
+                # If booking starts or ends on a closed day, invalid
+                return False
+            current += dt.timedelta(days=1)
+            continue
+        
+        # Get the time range for this specific day
+        if current == start_dt.date():
+            check_start = start_dt.time()
+        else:
+            # For multi-day bookings, assume it starts at opening time
+            check_start = dt.datetime.strptime(hours_data[day_key][0][0], "%H:%M").time()
+        
+        if current == end_dt.date():
+            check_end = end_dt.time()
+        else:
+            # For multi-day bookings, assume it ends at closing time
+            check_end = dt.datetime.strptime(hours_data[day_key][0][1], "%H:%M").time()
+        
+        # Check if this day's portion falls within opening hours
+        day_valid = False
+        for window in hours_data[day_key]:
+            if len(window) == 2:
+                open_time = dt.datetime.strptime(window[0], "%H:%M").time()
+                close_time = dt.datetime.strptime(window[1], "%H:%M").time()
+                if check_start >= open_time and check_end <= close_time:
+                    day_valid = True
+                    break
+        
+        if not day_valid:
+            return False
+        
+        current += dt.timedelta(days=1)
+    
+    return True
 
 # ---------------- Payment Functions ----------------
 def create_mercury_invoice(amount_cents, email, memo, metadata=None):
@@ -273,6 +379,48 @@ def calculate_pass_validity(pass_type, purchase_dt=None):
         raise ValueError(f"Invalid pass type: {pass_type}")
     
     return valid_from, valid_to
+
+def calculate_plan_price(resource, plan_type, seats=1, hours=1):
+    """Calculate price for a booking plan"""
+    if plan_type == "hour":
+        return resource.hourly_rate_cents * hours * seats
+    elif plan_type == "day":
+        return resource.day_rate_cents * seats
+    elif plan_type == "week":
+        return resource.week_rate_cents * seats
+    elif plan_type == "month":
+        return resource.month_rate_cents * seats
+    else:
+        raise ValueError(f"Invalid plan type: {plan_type}")
+
+def calculate_plan_duration(resource, plan_type, start_dt, hours=None):
+    """Calculate end datetime for a booking plan"""
+    if plan_type == "hour":
+        if not hours:
+            raise ValueError("Hours required for hourly booking")
+        return start_dt + dt.timedelta(hours=hours)
+    elif plan_type == "day":
+        # Book for the entire day within opening hours
+        hours_data = resource.get_opening_hours()
+        day_key = start_dt.strftime("%a").lower()
+        if day_key in hours_data and hours_data[day_key]:
+            # Use first time window of the day
+            open_time, close_time = hours_data[day_key][0]
+            start_time = dt.datetime.strptime(open_time, "%H:%M").time()
+            end_time = dt.datetime.strptime(close_time, "%H:%M").time()
+            start_dt = start_dt.replace(hour=start_time.hour, minute=start_time.minute, second=0, microsecond=0)
+            end_dt = start_dt.replace(hour=end_time.hour, minute=end_time.minute, second=0, microsecond=0)
+            return end_dt
+        else:
+            # Default to 9-17 if no hours configured
+            start_dt = start_dt.replace(hour=9, minute=0, second=0, microsecond=0)
+            return start_dt.replace(hour=17, minute=0, second=0, microsecond=0)
+    elif plan_type == "week":
+        return start_dt + dt.timedelta(days=7)
+    elif plan_type == "month":
+        return start_dt + dt.timedelta(days=30)
+    else:
+        raise ValueError(f"Invalid plan type: {plan_type}")
 
 # ---------------- Routes ----------------
 @app.get("/")
