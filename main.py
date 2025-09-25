@@ -28,6 +28,7 @@ ALLOW_POS_CHECKOUT = os.getenv("ALLOW_POS_CHECKOUT", "true").lower() == "true"
 
 # Stripe configuration
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
+STRIPE_PUBLIC_KEY = os.getenv("STRIPE_PUBLIC_KEY", "pk_test_placeholder")
 YOUR_DOMAIN = os.getenv('REPLIT_DEV_DOMAIN') if os.getenv('REPLIT_DEPLOYMENT') != '' else os.getenv('REPLIT_DOMAINS', 'localhost:5000').split(',')[0]
 
 # SendGrid configuration
@@ -2047,7 +2048,8 @@ def book_page():
                          allow_pos=ALLOW_POS_CHECKOUT,
                          pre_selected_plan=pre_selected_plan,
                          flow_type=flow_type,
-                         plan_display_names=plan_display_names)
+                         plan_display_names=plan_display_names,
+                         stripe_public_key=STRIPE_PUBLIC_KEY)
 
 @app.post("/book")
 def create_booking():
@@ -2059,10 +2061,11 @@ def create_booking():
     seats = int(request.form.get("seats", 1))
     code = request.form.get("promo", "").strip().upper()
     payment_method = request.form.get("payment_method", "online")
+    stripe_token = request.form.get("stripe_token")  # For authorization holds
     
-    return handle_plan_booking(email, name, resource_id, plan_type, seats, code, payment_method)
+    return handle_plan_booking(email, name, resource_id, plan_type, seats, code, payment_method, stripe_token)
 
-def handle_plan_booking(email, name, resource_id, plan_type, seats, code, payment_method):
+def handle_plan_booking(email, name, resource_id, plan_type, seats, code, payment_method, stripe_token=None):
     """Handle plan-based booking (hour/day/week/month)"""
     resource = Resource.query.get_or_404(resource_id)
     
@@ -2118,15 +2121,53 @@ def handle_plan_booking(email, name, resource_id, plan_type, seats, code, paymen
     
     # Handle payments
     if payment_method == "pos" and ALLOW_POS_CHECKOUT:
-        # Chase POS flow
-        payment = Payment()
-        payment.booking_id = booking.id
-        payment.provider = "chase"
-        payment.status = "pending"
-        payment.amount_cents = amount_cents
-        db.session.add(payment)
-        db.session.commit()
-        return redirect(url_for("success_pos", bid=booking.id))
+        if stripe_token and stripe.api_key:
+            # Create authorization hold with Stripe
+            try:
+                # Create payment intent with manual capture (authorization hold)
+                payment_intent = stripe.PaymentIntent.create(
+                    amount=amount_cents,
+                    currency='usd',
+                    payment_method=stripe_token,
+                    capture_method='manual',  # This creates an authorization hold
+                    confirm=True,
+                    description=f"{resource.name} - {plan_type.title()} booking for {email}",
+                    metadata={
+                        'booking_id': str(booking.id),
+                        'email': email,
+                        'resource_name': resource.name,
+                    }
+                )
+                
+                # Save payment record with authorization intent
+                payment = Payment()
+                payment.booking_id = booking.id
+                payment.provider = "stripe_auth"  # Different provider to distinguish from regular Stripe
+                payment.intent_id = payment_intent.id
+                payment.status = "authorized"  # New status for authorization holds
+                payment.amount_cents = amount_cents
+                db.session.add(payment)
+                db.session.commit()
+                
+                # Send booking confirmation email immediately
+                send_booking_confirmation_email(booking)
+                
+                return redirect(url_for("success_pos", bid=booking.id))
+                
+            except Exception as e:
+                print(f"Authorization hold failed: {str(e)}")
+                flash("Card authorization failed. Please try again or use online payment.", "error")
+                return redirect(url_for("book_page"))
+        else:
+            # Traditional Chase POS flow without card hold
+            payment = Payment()
+            payment.booking_id = booking.id
+            payment.provider = "chase"
+            payment.status = "pending"
+            payment.amount_cents = amount_cents
+            db.session.add(payment)
+            db.session.commit()
+            return redirect(url_for("success_pos", bid=booking.id))
     else:
         # Stripe online payment
         if stripe.api_key and amount_cents > 0:
