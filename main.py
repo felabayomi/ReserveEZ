@@ -6,6 +6,8 @@ from dotenv import load_dotenv
 import qrcode
 import requests
 import stripe
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail, Email, To, Content
 
 load_dotenv()
 
@@ -27,6 +29,9 @@ ALLOW_POS_CHECKOUT = os.getenv("ALLOW_POS_CHECKOUT", "true").lower() == "true"
 # Stripe configuration
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 YOUR_DOMAIN = os.getenv('REPLIT_DEV_DOMAIN') if os.getenv('REPLIT_DEPLOYMENT') != '' else os.getenv('REPLIT_DOMAINS', 'localhost:5000').split(',')[0]
+
+# SendGrid configuration
+SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
 
 # ---------------- Models ----------------
 class Resource(db.Model):
@@ -175,6 +180,94 @@ def parse_dt(date_str, time_str):
 
 def as_money(cents):
     return f"${Decimal(cents) / Decimal(100):.2f}"
+
+def send_booking_confirmation_email(booking):
+    """Send booking confirmation email to user and admin using SendGrid"""
+    if not SENDGRID_API_KEY:
+        print("SendGrid API key not configured, skipping email notification")
+        return False
+    
+    try:
+        sg = SendGridAPIClient(SENDGRID_API_KEY)
+        
+        # Prepare email content
+        subject = f"Booking Confirmation - {booking.resource.name}"
+        
+        # Create HTML content with booking details
+        html_content = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                <h2 style="color: #28a745; margin: 0;">Booking Confirmed!</h2>
+                <p style="margin: 10px 0 0 0;">Thank you for choosing EasyDesk at City Discoverer</p>
+            </div>
+            
+            <div style="background-color: #ffffff; border: 1px solid #dee2e6; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+                <h3 style="color: #495057; margin-top: 0;">Booking Details</h3>
+                <table style="width: 100%; border-collapse: collapse;">
+                    <tr style="border-bottom: 1px solid #dee2e6;">
+                        <td style="padding: 8px 0; font-weight: bold; color: #6c757d;">Workspace:</td>
+                        <td style="padding: 8px 0;">{booking.resource.name}</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid #dee2e6;">
+                        <td style="padding: 8px 0; font-weight: bold; color: #6c757d;">Customer:</td>
+                        <td style="padding: 8px 0;">{booking.customer_email}</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid #dee2e6;">
+                        <td style="padding: 8px 0; font-weight: bold; color: #6c757d;">Date & Time:</td>
+                        <td style="padding: 8px 0;">{booking.start_dt.strftime('%B %d, %Y at %I:%M %p')} - {booking.end_dt.strftime('%I:%M %p')}</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid #dee2e6;">
+                        <td style="padding: 8px 0; font-weight: bold; color: #6c757d;">Duration:</td>
+                        <td style="padding: 8px 0;">{int((booking.end_dt - booking.start_dt).total_seconds() / 3600)} hours</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid #dee2e6;">
+                        <td style="padding: 8px 0; font-weight: bold; color: #6c757d;">Seats:</td>
+                        <td style="padding: 8px 0;">{booking.num_seats}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 0; font-weight: bold; color: #6c757d;">Total:</td>
+                        <td style="padding: 8px 0; font-weight: bold; color: #28a745;">{as_money(booking.total_cost_cents)}</td>
+                    </tr>
+                </table>
+            </div>
+            
+            <div style="background-color: #e9ecef; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <p style="margin: 0; font-size: 14px; color: #6c757d;">
+                    <strong>Location:</strong> City Discoverer<br>
+                    50 Stately St, Suite 2, Wiley Ford WV 26767
+                </p>
+            </div>
+            
+            <div style="text-align: center; color: #6c757d; font-size: 12px; margin-top: 30px;">
+                <p>Questions? Reply to this email or contact us at hello@citydiscoverer.ai</p>
+            </div>
+        </body>
+        </html>
+        """
+        
+        # Create the email message
+        message = Mail(
+            from_email=Email("billing@citydiscoverer.ai", "EasyDesk Booking System"),
+            to_emails=[
+                To(booking.customer_email),  # Customer email
+                To("hello@citydiscoverer.ai")  # Admin email
+            ],
+            subject=subject,
+            html_content=Content("text/html", html_content)
+        )
+        
+        # Set reply-to address
+        message.reply_to = Email("hello@citydiscoverer.ai")
+        
+        # Send the email
+        response = sg.send(message)
+        print(f"Email sent successfully! Status code: {response.status_code}")
+        return True
+        
+    except Exception as e:
+        print(f"Failed to send booking confirmation email: {str(e)}")
+        return False
 
 def user_has_used_promo(email: str, code: str) -> bool:
     return Booking.query.filter(
