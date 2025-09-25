@@ -212,6 +212,127 @@ def seats_left(resource_id, start_dt, end_dt):
     
     return max(0, resource.capacity - used_seats)
 
+def get_hourly_availability(resource_id, date):
+    """Get detailed hourly availability for a resource on a specific date"""
+    resource = Resource.query.get(resource_id)
+    if not resource:
+        return {}
+    
+    # Get opening hours for this date
+    hours_data = resource.get_opening_hours()
+    weekday = date.strftime("%a").lower()
+    
+    if weekday not in hours_data or not hours_data[weekday]:
+        return {}  # Closed on this day
+    
+    availability = {}
+    
+    # Check each hour of the day
+    for window in hours_data[weekday]:
+        if len(window) == 2:
+            open_time, close_time = window
+            current_hour = dt.datetime.strptime(f"{date.strftime('%Y-%m-%d')} {open_time}", "%Y-%m-%d %H:%M")
+            close_hour = dt.datetime.strptime(f"{date.strftime('%Y-%m-%d')} {close_time}", "%Y-%m-%d %H:%M")
+            
+            while current_hour < close_hour:
+                hour_end = current_hour + dt.timedelta(hours=1)
+                hour_key = current_hour.strftime("%H:%M")
+                
+                # Calculate seats available for this hour
+                available_seats = seats_left(resource_id, current_hour, hour_end)
+                availability[hour_key] = available_seats
+                
+                current_hour = hour_end
+    
+    return availability
+
+def check_overflow_eligibility():
+    """Check if Meeting Lounge should be available as overflow at $3/hr"""
+    # Get Hot Desk and Quiet Desk IDs
+    hot_desk = Resource.query.filter_by(name="Hot Desk").first()
+    quiet_desk = Resource.query.filter_by(name="Quiet Desk").first()
+    
+    if not hot_desk or not quiet_desk:
+        return False
+    
+    return hot_desk.id, quiet_desk.id
+
+def get_resource_availability_for_date(date):
+    """Get comprehensive availability for all resources on a specific date"""
+    resources = Resource.query.filter_by(active=True).all()
+    availability = {}
+    
+    hot_desk_id, quiet_desk_id = None, None
+    meeting_lounge_id = None
+    
+    for resource in resources:
+        resource_avail = {
+            'resource': resource,
+            'hourly_availability': get_hourly_availability(resource.id, date),
+            'has_day_pass_booking': has_day_or_longer_pass_booking(resource.id, date),
+            'available_seats': resource.capacity,
+            'overflow_eligible': False
+        }
+        
+        # Track specific resource IDs for overflow logic
+        if resource.name == "Hot Desk":
+            hot_desk_id = resource.id
+        elif resource.name == "Quiet Desk":
+            quiet_desk_id = resource.id
+        elif resource.name == "Meeting Lounge":
+            meeting_lounge_id = resource.id
+        
+        availability[resource.id] = resource_avail
+    
+    # Check overflow eligibility for Meeting Lounge
+    if hot_desk_id and quiet_desk_id and meeting_lounge_id:
+        hot_desk_full = is_resource_fully_booked(hot_desk_id, date)
+        quiet_desk_full = is_resource_fully_booked(quiet_desk_id, date)
+        
+        if hot_desk_full and quiet_desk_full:
+            availability[meeting_lounge_id]['overflow_eligible'] = True
+            availability[meeting_lounge_id]['overflow_rate'] = 300  # $3/hr in cents
+    
+    return availability
+
+def has_day_or_longer_pass_booking(resource_id, date):
+    """Check if resource has any day/week/month pass bookings for the date"""
+    start_of_day = dt.datetime.combine(date, dt.time.min)
+    end_of_day = dt.datetime.combine(date, dt.time.max)
+    
+    pass_bookings = Booking.query.filter(
+        Booking.resource_id == resource_id,
+        Booking.plan_type.in_(["day", "week", "month"]),
+        Booking.status.in_(["reserved", "paid", "checked_in", "free"]),
+        Booking.start_dt <= end_of_day,
+        Booking.end_dt >= start_of_day
+    ).first()
+    
+    return pass_bookings is not None
+
+def is_resource_fully_booked(resource_id, date):
+    """Check if a resource is completely unavailable for the entire day"""
+    resource = Resource.query.get(resource_id)
+    if not resource:
+        return True
+    
+    # If there's a day/week/month pass that uses all capacity, it's fully booked
+    if has_day_or_longer_pass_booking(resource_id, date):
+        return True
+    
+    # Check if all hourly slots are taken
+    hourly_avail = get_hourly_availability(resource_id, date)
+    
+    if not hourly_avail:
+        return True  # No operating hours = fully booked
+    
+    # Resource is fully booked if ALL hours have 0 available seats
+    for hour, available_seats in hourly_avail.items():
+        if available_seats > 0:
+            return False  # Found at least one hour with available seats
+    
+    return True  # All hours are fully booked
+
 def active_pass(email, at_dt):
     """Check for active pass for user at given datetime"""
     return Pass.query.filter(
@@ -239,7 +360,7 @@ def day_bookings(date_str):
     return grouped
 
 def validate_booking_availability(resource_id, plan_type, seats, start_dt, end_dt=None, hours=None):
-    """Validate if a booking can be made with comprehensive availability checking"""
+    """Validate if a booking can be made with comprehensive seat + hour availability checking"""
     resource = Resource.query.get(resource_id)
     if not resource or not resource.active:
         return False, "Resource not available"
@@ -256,12 +377,93 @@ def validate_booking_availability(resource_id, plan_type, seats, start_dt, end_d
     if not is_booking_within_hours(resource, start_dt, end_dt):
         return False, "Booking time is outside opening hours"
     
-    # Check availability for the entire time window
-    available_seats = seats_left(resource_id, start_dt, end_dt)
-    if available_seats < seats:
-        return False, f"Only {available_seats} seats available, but {seats} requested"
+    # New logic: Different validation for different plan types
+    if plan_type == "hour":
+        # For hourly bookings, check hour-by-hour availability
+        return validate_hourly_booking(resource_id, seats, start_dt, end_dt)
+    else:
+        # For day/week/month passes, check if there are conflicts with existing passes
+        return validate_pass_booking(resource_id, seats, start_dt, end_dt, plan_type)
+
+def validate_hourly_booking(resource_id, seats, start_dt, end_dt):
+    """Validate hourly booking with detailed hour-by-hour checking"""
+    current_hour = start_dt
+    
+    while current_hour < end_dt:
+        hour_end = current_hour + dt.timedelta(hours=1)
+        available_seats = seats_left(resource_id, current_hour, hour_end)
+        
+        if available_seats < seats:
+            time_str = current_hour.strftime("%H:%M")
+            return False, f"Only {available_seats} seats available at {time_str}, but {seats} requested"
+        
+        current_hour = hour_end
     
     return True, "Available"
+
+def validate_pass_booking(resource_id, seats, start_dt, end_dt, plan_type):
+    """Validate day/week/month pass booking against existing bookings"""
+    # Check if there are conflicting day/week/month passes
+    conflicting_passes = Booking.query.filter(
+        Booking.resource_id == resource_id,
+        Booking.plan_type.in_(["day", "week", "month"]),
+        Booking.status.in_(["reserved", "paid", "checked_in", "free"]),
+        Booking.start_dt < end_dt,
+        Booking.end_dt > start_dt
+    ).all()
+    
+    # Calculate total seats used by existing passes
+    pass_seats_used = sum(booking.seats for booking in conflicting_passes)
+    
+    # Check if hourly bookings would conflict
+    hourly_conflicts = check_hourly_conflicts_with_pass(resource_id, seats, start_dt, end_dt)
+    
+    resource = Resource.query.get(resource_id)
+    if not resource:
+        return False, "Resource not found"
+    
+    total_needed = pass_seats_used + seats
+    
+    if total_needed > resource.capacity:
+        return False, f"Pass booking conflicts with existing reservations. Only {resource.capacity - pass_seats_used} seats available."
+    
+    if hourly_conflicts:
+        return False, "Pass booking conflicts with existing hourly bookings. Please choose different dates."
+    
+    return True, "Available"
+
+def check_hourly_conflicts_with_pass(resource_id, pass_seats, start_dt, end_dt):
+    """Check if a pass booking would conflict with existing hourly bookings"""
+    # Get all hourly bookings that overlap with the pass period
+    hourly_bookings = Booking.query.filter(
+        Booking.resource_id == resource_id,
+        Booking.plan_type == "hour",
+        Booking.status.in_(["reserved", "paid", "checked_in", "free"]),
+        Booking.start_dt < end_dt,
+        Booking.end_dt > start_dt
+    ).all()
+    
+    resource = Resource.query.get(resource_id)
+    if not resource:
+        return True  # If resource not found, consider it a conflict to be safe
+    
+    remaining_capacity = resource.capacity - pass_seats
+    
+    # Group hourly bookings by time slots
+    hourly_usage = {}
+    for booking in hourly_bookings:
+        current = booking.start_dt
+        while current < booking.end_dt:
+            hour_key = current.strftime("%Y-%m-%d %H:%M")
+            hourly_usage[hour_key] = hourly_usage.get(hour_key, 0) + booking.seats
+            current += dt.timedelta(hours=1)
+    
+    # Check if any hour exceeds available capacity after pass booking
+    for hour_key, seats_used in hourly_usage.items():
+        if seats_used > remaining_capacity:
+            return True  # Conflict found
+    
+    return False  # No conflicts
 
 def is_booking_within_hours(resource, start_dt, end_dt):
     """Check if entire booking duration falls within opening hours"""
@@ -749,6 +951,54 @@ def success_pos_pass():
 def cancel():
     bid = request.args.get("bid")
     return render_template("cancel.html", bid=bid)
+
+@app.get("/api/availability/<date>")
+def api_availability(date):
+    """API endpoint to get comprehensive availability data for the calendar"""
+    try:
+        parsed_date = dt.datetime.strptime(date, "%Y-%m-%d").date()
+        availability_data = get_resource_availability_for_date(parsed_date)
+        
+        # Format data for frontend consumption
+        formatted_data = {}
+        for resource_id, avail_info in availability_data.items():
+            resource = avail_info['resource']
+            
+            # Calculate overall availability status
+            is_fully_booked = is_resource_fully_booked(resource_id, parsed_date)
+            has_pass_booking = avail_info['has_day_pass_booking']
+            hourly_avail = avail_info['hourly_availability']
+            
+            # Determine status for calendar coloring
+            if is_fully_booked:
+                status = 'booked'
+            elif has_pass_booking or any(seats == 0 for seats in hourly_avail.values()):
+                status = 'limited'
+            else:
+                status = 'available'
+            
+            formatted_data[resource_id] = {
+                'name': resource.name,
+                'capacity': resource.capacity,
+                'status': status,
+                'hourly_availability': hourly_avail,
+                'has_pass_booking': has_pass_booking,
+                'overflow_eligible': avail_info.get('overflow_eligible', False),
+                'overflow_rate': avail_info.get('overflow_rate', None),
+                'rates': {
+                    'hourly': resource.hourly_rate_cents,
+                    'day': resource.day_rate_cents,
+                    'week': resource.week_rate_cents,
+                    'month': resource.month_rate_cents
+                }
+            }
+        
+        return jsonify(formatted_data)
+    
+    except ValueError:
+        return jsonify({'error': 'Invalid date format. Use YYYY-MM-DD'}), 400
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.post("/webhook/mercury")
 def mercury_webhook():
