@@ -58,8 +58,53 @@
   {% block content %}{% endblock %}
 </main>
 
-<footer class="border-top py-3 text-center small text-muted">
-  All rights reserved Expedition America Travel Co LLC DBA, City Discoverer
+<footer class="border-top py-4 text-center small text-muted">
+  <div class="container">
+    <!-- Security Badges -->
+    <div class="d-flex justify-content-center align-items-center flex-wrap mb-3 gap-4">
+      <!-- SSL Badge -->
+      <div class="d-flex align-items-center text-success">
+        <svg width="16" height="16" fill="currentColor" class="me-1" viewBox="0 0 16 16">
+          <path d="M8 1a2 2 0 0 1 2 2v4H6V3a2 2 0 0 1 2-2zm3 6V3a3 3 0 0 0-6 0v4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2zM5 8h6a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/>
+        </svg>
+        <span class="fw-bold">SSL SECURED</span>
+      </div>
+      
+      <!-- PCI Compliance Badge -->
+      <div class="d-flex align-items-center text-primary">
+        <svg width="16" height="16" fill="currentColor" class="me-1" viewBox="0 0 16 16">
+          <path d="M8 0a8 8 0 1 0 0 16A8 8 0 0 0 8 0zM7.002 11.002a.868.868 0 1 1 1.736 0 .868.868 0 0 1-1.736 0zm.282-3.999a.5.5 0 0 1-.004-.693A2.5 2.5 0 1 1 10.5 9.5a.5.5 0 0 1-1 0 1.5 1.5 0 1 0-2.216-1.192z"/>
+        </svg>
+        <span class="fw-bold">PCI DSS COMPLIANT</span>
+      </div>
+      
+      <!-- Stripe Badge -->
+      <div class="d-flex align-items-center text-info">
+        <svg width="16" height="16" fill="currentColor" class="me-1" viewBox="0 0 16 16">
+          <path d="M2 2a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H2zm2.5 1.5h7a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-7a.5.5 0 0 1-.5-.5V4a.5.5 0 0 1 .5-.5zm0 3h7a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-7a.5.5 0 0 1-.5-.5V7a.5.5 0 0 1 .5-.5z"/>
+        </svg>
+        <span class="fw-bold">STRIPE VERIFIED</span>
+      </div>
+      
+      <!-- Secure Payments Badge -->
+      <div class="d-flex align-items-center text-warning">
+        <svg width="16" height="16" fill="currentColor" class="me-1" viewBox="0 0 16 16">
+          <path d="M5.5 7a.5.5 0 0 0 0 1h5a.5.5 0 0 0 0-1h-5zM8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0zM7 2.5A1.5 1.5 0 0 1 8.5 1h.5a.5.5 0 0 1 0 1h-.5a.5.5 0 0 0-.5.5v1h1a.5.5 0 0 1 0 1H7a.5.5 0 0 1-.5-.5v-1A1.5 1.5 0 0 1 7 2.5z"/>
+        </svg>
+        <span class="fw-bold">256-BIT ENCRYPTION</span>
+      </div>
+    </div>
+    
+    <!-- Copyright -->
+    <div class="text-muted">
+      All rights reserved Expedition America Travel Co LLC DBA, City Discoverer
+    </div>
+    
+    <!-- Security Statement -->
+    <div class="text-muted mt-2" style="font-size: 0.75rem;">
+      Your payment information is processed securely. We do not store credit card details.
+    </div>
+  </div>
 </footer>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
