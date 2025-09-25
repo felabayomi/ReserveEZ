@@ -483,7 +483,7 @@ def handle_plan_booking(email, name, resource_id, plan_type, seats, code, paymen
         return redirect(url_for("book_page"))
     
     # Calculate pricing
-    amount_cents = calculate_plan_price(resource, plan_type, seats, hours)
+    amount_cents = calculate_plan_price(resource, plan_type, seats, int(hours) if plan_type == "hour" else 1)
     
     # Check for active pass (for future pass integration)
     user_pass = active_pass(email, start_dt)
@@ -582,7 +582,7 @@ def parse_plan_dates(plan_type, resource):
         
         # Get opening hours for this day
         hours_data = resource.get_opening_hours()
-        parsed_date = dt.datetime.strptime(booking_date, "%Y-%m-%d")
+        parsed_date = dt.datetime.strptime(booking_date or dt.date.today().isoformat(), "%Y-%m-%d")
         day_key = parsed_date.strftime("%a").lower()
         
         if day_key in hours_data and hours_data[day_key]:

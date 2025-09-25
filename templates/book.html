@@ -194,7 +194,19 @@
 
 <script>
 // Resource data for JavaScript
-const resources = {{ resources|map(attribute='__dict__')|list|tojson }};
+const resources = [
+  {% for r in resources %}
+  {
+    id: {{ r.id }},
+    name: "{{ r.name }}",
+    hourly_rate_cents: {{ r.hourly_rate_cents }},
+    day_rate_cents: {{ r.day_rate_cents }},
+    week_rate_cents: {{ r.week_rate_cents }},
+    month_rate_cents: {{ r.month_rate_cents }},
+    capacity: {{ r.capacity }}
+  }{% if not loop.last %},{% endif %}
+  {% endfor %}
+];
 const resourcesData = {};
 resources.forEach(r => {
   resourcesData[r.id] = r;
