@@ -7,7 +7,7 @@
   <div class="col-12">
     <div class="alert alert-info">
       <strong>{{ pre_selected_plan.title() }} booking selected</strong> — Choose your workspace below
-      <a href="/" class="btn btn-sm btn-outline-secondary ms-3">← Change plan</a>
+      <button class="btn btn-sm btn-outline-secondary ms-3" data-bs-toggle="modal" data-bs-target="#changePlanModal">← Change plan</button>
     </div>
   </div>
 </div>
@@ -208,6 +208,91 @@
   </div>
 </div>
 
+<!-- Change Plan Modal (for pre-selected plan flow) -->
+<div class="modal fade" id="changePlanModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Choose your booking plan</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted mb-4">How long do you need the workspace?</p>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <div class="card plan-card plan-hourly h-100" onclick="changePlan('hour')">
+              <div class="card-body text-center">
+                <div class="plan-icon mb-3">⏰</div>
+                <h5 class="card-title text-info">Hourly</h5>
+                <p class="card-text">Perfect for short meetings or focused work sessions.</p>
+                <div class="pricing-examples">
+                  <small class="text-muted">Starting from</small>
+                  <div class="price-display"><strong>$5</strong>/hour</div>
+                </div>
+                <div class="mt-3">
+                  <span class="badge bg-info">Flexible timing</span>
+                  <span class="badge bg-outline-info">Pay as you go</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="card plan-card plan-day h-100" onclick="changePlan('day')">
+              <div class="card-body text-center">
+                <div class="plan-icon mb-3">📅</div>
+                <h5 class="card-title text-success">Day Pass</h5>
+                <p class="card-text">Full day access within our business hours.</p>
+                <div class="pricing-examples">
+                  <small class="text-muted">Starting from</small>
+                  <div class="price-display"><strong>$15</strong>/day</div>
+                </div>
+                <div class="mt-3">
+                  <span class="badge bg-success">Best for full days</span>
+                  <span class="badge bg-outline-success">9 AM - 6 PM</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="card plan-card plan-week h-100" onclick="changePlan('week')">
+              <div class="card-body text-center">
+                <div class="plan-icon mb-3">📊</div>
+                <h5 class="card-title text-warning">Week Pass</h5>
+                <p class="card-text">7 consecutive days of unlimited access.</p>
+                <div class="pricing-examples">
+                  <small class="text-muted">Starting from</small>
+                  <div class="price-display"><strong>$60</strong>/week</div>
+                </div>
+                <div class="mt-3">
+                  <span class="badge bg-warning text-dark">Great value</span>
+                  <span class="badge bg-outline-warning">7 full days</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="card plan-card plan-month h-100" onclick="changePlan('month')">
+              <div class="card-body text-center">
+                <div class="plan-icon mb-3">🏢</div>
+                <h5 class="card-title text-primary">Month Pass</h5>
+                <p class="card-text">30 consecutive days of unlimited access.</p>
+                <div class="pricing-examples">
+                  <small class="text-muted">Starting from</small>
+                  <div class="price-display"><strong>$150</strong>/month</div>
+                </div>
+                <div class="mt-3">
+                  <span class="badge bg-primary">Best value</span>
+                  <span class="badge bg-outline-primary">30 full days</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 {% if not pre_selected_plan %}
 <!-- Original Modal Flow (only shown when no plan is pre-selected) -->
 <!-- Step 1: Resource Selection Modal -->
@@ -287,6 +372,16 @@ resources.forEach(r => {
 
 let selectedResource = null;
 let selectedPlan = '{{ pre_selected_plan }}' || null;
+
+// Function to change plan (for change plan modal)
+function changePlan(planType) {
+  // Close the modal
+  const modal = bootstrap.Modal.getInstance(document.getElementById('changePlanModal'));
+  modal.hide();
+  
+  // Redirect to booking page with new selected plan
+  window.location.href = `/book?plan=${planType}`;
+}
 
 // Function for pre-selected plan flow
 function selectResourceForPlan(resourceId, resourceName, planType) {
