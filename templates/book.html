@@ -467,6 +467,91 @@
   </div>
 </div>
 
+<!-- Plan Selection Modal for Flow Switching -->
+<div class="modal fade" id="planSelectionModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Choose your booking plan</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted mb-4">How long do you need the workspace?</p>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <div class="card plan-card plan-hourly h-100" onclick="selectPlan('hour')">
+              <div class="card-body text-center">
+                <div class="plan-icon mb-3">⏰</div>
+                <h5 class="card-title text-info">Hourly</h5>
+                <p class="card-text">Perfect for short meetings or focused work sessions.</p>
+                <div class="pricing-examples">
+                  <small class="text-muted">Starting from</small>
+                  <div class="price-display"><strong>$5</strong>/hour</div>
+                </div>
+                <div class="mt-3">
+                  <span class="badge bg-info">Flexible timing</span>
+                  <span class="badge bg-outline-info">Pay as you go</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="card plan-card plan-day h-100" onclick="selectPlan('day')">
+              <div class="card-body text-center">
+                <div class="plan-icon mb-3">📅</div>
+                <h5 class="card-title text-success">Day Pass</h5>
+                <p class="card-text">Full day access within our business hours.</p>
+                <div class="pricing-examples">
+                  <small class="text-muted">Starting from</small>
+                  <div class="price-display"><strong>$15</strong>/day</div>
+                </div>
+                <div class="mt-3">
+                  <span class="badge bg-success">Best for full days</span>
+                  <span class="badge bg-outline-success">9 AM - 6 PM</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="card plan-card plan-week h-100" onclick="selectPlan('week')">
+              <div class="card-body text-center">
+                <div class="plan-icon mb-3">📊</div>
+                <h5 class="card-title text-warning">Week Pass</h5>
+                <p class="card-text">7 consecutive days of unlimited access.</p>
+                <div class="pricing-examples">
+                  <small class="text-muted">Starting from</small>
+                  <div class="price-display"><strong>$60</strong>/week</div>
+                </div>
+                <div class="mt-3">
+                  <span class="badge bg-warning text-dark">Great value</span>
+                  <span class="badge bg-outline-warning">7 full days</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="card plan-card plan-month h-100" onclick="selectPlan('month')">
+              <div class="card-body text-center">
+                <div class="plan-icon mb-3">🏢</div>
+                <h5 class="card-title text-primary">Month Pass</h5>
+                <p class="card-text">30 consecutive days of unlimited access.</p>
+                <div class="pricing-examples">
+                  <small class="text-muted">Starting from</small>
+                  <div class="price-display"><strong>$150</strong>/month</div>
+                </div>
+                <div class="mt-3">
+                  <span class="badge bg-primary">Best value</span>
+                  <span class="badge bg-outline-primary">30 full days</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Step 2: Plan Selection Modal -->
 <div class="modal fade" id="planModal" tabindex="-1">
   <div class="modal-dialog">
@@ -1450,6 +1535,105 @@ document.addEventListener('DOMContentLoaded', function() {
       box-shadow: 0 2px 8px rgba(0,0,0,0.2);
     }
     
+    /* Plan Card Styles for Modal */
+    .plan-card {
+      cursor: pointer;
+      transition: all 0.3s ease;
+      border: 3px solid transparent;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    /* Hourly - Blue Theme */
+    .plan-hourly {
+      background: linear-gradient(135deg, #e3f2fd 0%, #f8fdff 100%);
+      border-color: #03a9f4;
+    }
+    .plan-hourly:hover {
+      transform: translateY(-8px);
+      box-shadow: 0 12px 30px rgba(3, 169, 244, 0.3);
+      border-color: #0288d1;
+    }
+    
+    /* Day Pass - Green Theme */
+    .plan-day {
+      background: linear-gradient(135deg, #e8f5e8 0%, #f1fdf1 100%);
+      border-color: #4caf50;
+    }
+    .plan-day:hover {
+      transform: translateY(-8px);
+      box-shadow: 0 12px 30px rgba(76, 175, 80, 0.3);
+      border-color: #388e3c;
+    }
+    
+    /* Week Pass - Orange Theme */
+    .plan-week {
+      background: linear-gradient(135deg, #fff3e0 0%, #fffaf7 100%);
+      border-color: #ff9800;
+    }
+    .plan-week:hover {
+      transform: translateY(-8px);
+      box-shadow: 0 12px 30px rgba(255, 152, 0, 0.3);
+      border-color: #f57c00;
+    }
+    
+    /* Month Pass - Purple Theme */
+    .plan-month {
+      background: linear-gradient(135deg, #f3e5f5 0%, #faf8fb 100%);
+      border-color: #9c27b0;
+    }
+    .plan-month:hover {
+      transform: translateY(-8px);
+      box-shadow: 0 12px 30px rgba(156, 39, 176, 0.3);
+      border-color: #7b1fa2;
+    }
+    
+    /* Enhanced icon styling */
+    .plan-icon {
+      font-size: 3rem;
+      display: block;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    /* Better price display */
+    .price-display {
+      font-size: 1.5rem;
+      font-weight: bold;
+      margin: 0.5rem 0;
+    }
+    
+    /* Custom badge styles */
+    .bg-outline-info {
+      background-color: transparent;
+      border: 1px solid #03a9f4;
+      color: #03a9f4;
+    }
+    .bg-outline-success {
+      background-color: transparent;
+      border: 1px solid #4caf50;
+      color: #4caf50;
+    }
+    .bg-outline-warning {
+      background-color: transparent;
+      border: 1px solid #ff9800;
+      color: #ff9800;
+    }
+    .bg-outline-primary {
+      background-color: transparent;
+      border: 1px solid #9c27b0;
+      color: #9c27b0;
+    }
+    
+    /* Add subtle animation to icons */
+    @keyframes iconPulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+    
+    .plan-card:hover .plan-icon {
+      animation: iconPulse 1s ease-in-out infinite;
+    }
+
     /* Responsive adjustments */
     @media (max-width: 768px) {
       .calendar-day {
@@ -1479,8 +1663,9 @@ document.addEventListener('DOMContentLoaded', function() {
 <!-- Flow Switching JavaScript -->
 <script>
 function switchToPlanFirst() {
-  // Show the plan selection modal for plan-first flow
-  window.location.href = '/?flow=plan-first#planModal';
+  // Show the plan selection modal directly on this page
+  const planModal = new bootstrap.Modal(document.getElementById('planSelectionModal'));
+  planModal.show();
 }
 
 function switchToWorkspaceFirst() {
