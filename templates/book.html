@@ -324,10 +324,6 @@
                     <span>Available</span>
                   </div>
                   <div class="legend-item">
-                    <span class="legend-color" style="background: #fff3cd; border: 2px solid #ffc107;"></span>
-                    <span>Limited</span>
-                  </div>
-                  <div class="legend-item">
                     <span class="legend-color" style="background: #f8d7da; border: 2px solid #dc3545;"></span>
                     <span>Fully Booked</span>
                   </div>
@@ -340,8 +336,8 @@
                     <span>Today</span>
                   </div>
                   <div class="legend-item">
-                    <span class="legend-color" style="background: #fff3cd; border: 2px solid #ffc107; display: flex; align-items: center; justify-content: center;">📋</span>
-                    <span>Meeting Lounge overflow ($3/hr)</span>
+                    <span class="legend-color" style="background: white; border: 2px solid #dee2e6; display: flex; align-items: center; justify-content: center;">📋</span>
+                    <span>Meeting Lounge overflow available</span>
                   </div>
                 </div>
                 
@@ -560,49 +556,35 @@ function applyAvailabilityToCalendar(day, availability) {
     // Remove any existing availability classes
     dayCell.classList.remove('availability-available', 'availability-limited', 'availability-booked');
     
-    // Determine overall availability status for the day
-    let overallStatus = 'available';
+    // Check if ALL resources are completely booked (no hourly or pass availability)
+    let allResourcesBooked = true;
     let hasOverflow = false;
     
     // Check each resource's status
     for (const [resourceId, resourceData] of Object.entries(availability)) {
-      if (resourceData.status === 'booked') {
-        if (overallStatus !== 'booked') overallStatus = 'limited';
-      } else if (resourceData.status === 'limited') {
-        overallStatus = 'limited';
-      }
-      
       // Check for overflow eligibility
       if (resourceData.overflow_eligible) {
         hasOverflow = true;
       }
+      
+      // If any resource has availability (hourly or pass), day is not fully booked
+      if (resourceData.status !== 'booked') {
+        allResourcesBooked = false;
+      }
     }
     
-    // If all primary resources are booked but overflow is available, mark as limited
-    const hotDeskBooked = Object.values(availability).find(r => r.name === 'Hot Desk')?.status === 'booked';
-    const quietDeskBooked = Object.values(availability).find(r => r.name === 'Quiet Desk')?.status === 'booked';
-    if (hotDeskBooked && quietDeskBooked && hasOverflow) {
-      overallStatus = 'limited';
+    // Only apply red styling if ALL resources are completely booked AND no overflow
+    if (allResourcesBooked && !hasOverflow) {
+      dayCell.classList.add('availability-booked');
     }
-    
-    // Apply the status
-    dayCell.classList.add(`availability-${overallStatus}`);
     
     // Store detailed availability data for when user clicks
     dayCell.setAttribute('data-availability', JSON.stringify(availability));
     
-    // Add indicators
+    // Add indicators for overflow only (no other color indicators)
     const bookingsContainer = dayCell.querySelector('.day-bookings');
     if (bookingsContainer) {
       bookingsContainer.innerHTML = ''; // Clear existing indicators
-      
-      if (overallStatus === 'limited') {
-        const indicator = document.createElement('div');
-        indicator.className = 'availability-indicator limited';
-        indicator.innerHTML = '⚡';
-        indicator.title = 'Limited availability';
-        bookingsContainer.appendChild(indicator);
-      }
       
       if (hasOverflow) {
         const overflowIndicator = document.createElement('div');
