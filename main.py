@@ -1062,6 +1062,10 @@ def success_free():
         abort(400)
     bid = int(bid_str)
     booking = Booking.query.get_or_404(bid)
+    
+    # Send confirmation email
+    send_booking_confirmation_email(booking)
+    
     return render_template("success.html", booking=booking, as_money=as_money)
 
 @app.get("/success-pos")
@@ -1071,6 +1075,10 @@ def success_pos():
         abort(400)
     bid = int(bid_str)
     booking = Booking.query.get_or_404(bid)
+    
+    # Send confirmation email
+    send_booking_confirmation_email(booking)
+    
     return render_template("success_pos.html", booking=booking, as_money=as_money)
 
 @app.get("/success-pos-pass")
@@ -1108,6 +1116,9 @@ def success_stripe():
                 payment.intent_id = session.payment_intent
             
             db.session.commit()
+            
+            # Send confirmation email
+            send_booking_confirmation_email(booking)
             
             return render_template("success.html", booking=booking, as_money=as_money, payment_method="stripe")
         else:
