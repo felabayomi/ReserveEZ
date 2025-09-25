@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+  <div class="row justify-content-center">
+    <div class="col-lg-8">
+      <h1 class="mb-4 text-center">About Us</h1>
+      
+      <!-- About Section -->
+      <div class="card mb-4">
+        <div class="card-body">
+          <h3 class="card-title text-primary mb-3">About</h3>
+          <p class="lead">
+            At City Discoverer EasyDesk, we believe work should be flexible, affordable, and inspiring. Located at 50 Stately St, Suite 2, Wiley Ford WV 26767—just minutes from downtown Cumberland, MD—we provide a professional coworking space where individuals, freelancers, and small teams can thrive.
+          </p>
+          <p>
+            Our space is designed for productivity, connection, and discovery. Whether you need a quiet desk for a few hours, a weekly pass for consistent work, or a monthly plan for your business, EasyDesk adapts to your needs.
+          </p>
+        </div>
+      </div>
+
+      <!-- Services Section -->
+      <div class="card mb-4">
+        <div class="card-body">
+          <h3 class="card-title text-primary mb-3">Services</h3>
+          <div class="row">
+            <div class="col-md-6">
+              <ul class="list-unstyled">
+                <li class="mb-2">
+                  <strong>📅 Hourly Desks</strong> – book a desk by the hour and pay only for the time you need.
+                </li>
+                <li class="mb-2">
+                  <strong>🌅 Day Passes ($25/day)</strong> – enjoy unlimited access to our desks for a full workday.
+                </li>
+                <li class="mb-2">
+                  <strong>📅 Weekly Passes ($100/week)</strong> – flexible access for 7 days of productivity.
+                </li>
+              </ul>
+            </div>
+            <div class="col-md-6">
+              <ul class="list-unstyled">
+                <li class="mb-2">
+                  <strong>📆 Monthly Passes ($300/month)</strong> – your dedicated coworking base for 30 days.
+                </li>
+                <li class="mb-2">
+                  <strong>🪑 Meeting Lounge</strong> – a comfortable space for small groups or overflow seating when desks are full.
+                </li>
+                <li class="mb-2">
+                  <strong>🌐 Amenities</strong> – strong Wi-Fi, office seating, and a professional environment to help you focus.
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Contact Section -->
+      <div class="card mb-4">
+        <div class="card-body">
+          <h3 class="card-title text-primary mb-3">Contact</h3>
+          <div class="row">
+            <div class="col-md-4 text-center mb-3">
+              <div class="p-3 bg-light rounded">
+                <h5 class="text-info">📧 Email</h5>
+                <a href="mailto:hello@citydiscoverer.ai" class="text-decoration-none">hello@citydiscoverer.ai</a>
+              </div>
+            </div>
+            <div class="col-md-4 text-center mb-3">
+              <div class="p-3 bg-light rounded">
+                <h5 class="text-success">📞 Phone</h5>
+                <a href="tel:240-664-2260" class="text-decoration-none">240-664-2260</a>
+              </div>
+            </div>
+            <div class="col-md-4 text-center mb-3">
+              <div class="p-3 bg-light rounded">
+                <h5 class="text-warning">📍 Address</h5>
+                <p class="mb-0">50 Stately St, Suite 2<br>Wiley Ford WV 26767</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Call to Action -->
+      <div class="text-center mb-4">
+        <a href="/book" class="btn btn-primary btn-lg me-3">Book Your Desk</a>
+        <a href="/" class="btn btn-outline-secondary">Back to Home</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -2031,6 +2031,10 @@ def index():
     resources = Resource.query.filter_by(active=True).all()
     return render_template("index.html", resources=resources)
 
+@app.get("/about")
+def about():
+    return render_template("about.html")
+
 @app.get("/book")
 def book_page():
     resources = Resource.query.filter_by(active=True).all()
