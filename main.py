@@ -488,6 +488,8 @@ def handle_pass_purchase(email, name):
             db.session.commit()
             
             return redirect(mercury_result["pay_url"])
+    
+    return redirect(url_for("book_page"))
 
 @app.get("/success")
 def success():
