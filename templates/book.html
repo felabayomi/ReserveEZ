@@ -319,17 +319,8 @@
               </div>
               <div class="card-body">
                 <div class="legend-items">
-                  <div class="legend-item">
-                    <span class="legend-color" style="background: #d4edda; border: 2px solid #28a745;"></span>
-                    <span>Available</span>
-                  </div>
-                  <div class="legend-item">
-                    <span class="legend-color" style="background: #fff3cd; border: 2px solid #ffc107;"></span>
-                    <span>Limited</span>
-                  </div>
-                  <div class="legend-item">
-                    <span class="legend-color" style="background: #f8d7da; border: 2px solid #dc3545;"></span>
-                    <span>Fully Booked</span>
+                  <div class="text-center">
+                    <small class="text-muted">All dates are available until booked</small>
                   </div>
                 </div>
                 
@@ -519,22 +510,8 @@ function isDateSelected(date) {
 }
 
 async function fetchAvailabilityData(year, month) {
-  // Only color-code dates that actually have booking constraints
-  // Most dates should be normal/white unless there are actual bookings or issues
-  const datesWithBookings = {
-    '2025-09-27': { status: 'limited', details: { 'Hot Desk': { hour: false, day: false, week: false, month: false }, 'Meeting Lounge': { hour: true, day: true, week: false, month: false } } },
-    '2025-09-29': { status: 'booked', details: {} },
-    '2025-09-30': { status: 'limited', details: { 'Whole Room': { hour: false, day: false, week: false, month: true } } },
-    '2025-10-02': { status: 'booked', details: {} },
-  };
-  
-  // Only apply colors to dates that actually have booking constraints
-  Object.entries(datesWithBookings).forEach(([dateStr, availability]) => {
-    const [availYear, availMonth, availDay] = dateStr.split('-').map(Number);
-    if (availYear === year && availMonth === month + 1) {
-      applyAvailabilityToCalendar(availDay, availability);
-    }
-  });
+  // No mock data - all dates are available until there are actual bookings
+  // Calendar will stay clean and white unless there are real booking constraints
 }
 
 function applyAvailabilityToCalendar(day, availability) {
@@ -591,56 +568,43 @@ function updateSelectedDateInfo(dateString) {
     day: 'numeric' 
   });
   
-  // Get availability details from the clicked date
-  const clickedDay = document.querySelector(`[data-date="${dateString}"]`);
-  const availabilityData = clickedDay ? JSON.parse(clickedDay.getAttribute('data-availability') || '{}') : {};
-  
   info.querySelector('h6').textContent = 'Selected Date';
   info.querySelector('p').innerHTML = `<strong>${formattedDate}</strong>`;
   
-  // Show detailed availability breakdown
-  if (Object.keys(availabilityData).length > 0) {
-    let detailsHTML = '<div class="availability-breakdown mt-3">';
+  // Show seat availability for each resource and booking type
+  let detailsHTML = '<div class="availability-breakdown mt-3">';
+  
+  // Show availability for each resource using the actual resource data
+  Object.values(resourcesData).forEach(resource => {
+    const availableSeats = resource.capacity; // In real app, this would check actual bookings
     
-    Object.entries(availabilityData).forEach(([resource, plans]) => {
-      detailsHTML += `
-        <div class="resource-availability mb-3">
-          <h6 class="small mb-2"><strong>${resource}</strong></h6>
-          <div class="plan-availability">
-            <span class="plan-status ${plans.hour ? 'available' : 'unavailable'}">
-              Hourly ${plans.hour ? '✅' : '❌'}
-            </span>
-            <span class="plan-status ${plans.day ? 'available' : 'unavailable'}">
-              Day ${plans.day ? '✅' : '❌'}
-            </span>
-            <span class="plan-status ${plans.week ? 'available' : 'unavailable'}">
-              Week ${plans.week ? '✅' : '❌'}
-            </span>
-            <span class="plan-status ${plans.month ? 'available' : 'unavailable'}">
-              Month ${plans.month ? '✅' : '❌'}
-            </span>
-          </div>
+    detailsHTML += `
+      <div class="resource-availability mb-3">
+        <h6 class="small mb-2"><strong>${resource.name}</strong></h6>
+        <div class="seats-info mb-2">
+          <small class="text-muted">${availableSeats} seats available</small>
         </div>
-      `;
-    });
-    
-    detailsHTML += '</div>';
-    detailsDiv.innerHTML = detailsHTML;
-    detailsDiv.style.display = 'block';
-  } else {
-    // For unbooked dates, show that all booking types are available
-    detailsDiv.innerHTML = `
-      <div class="availability-breakdown mt-3">
-        <div class="text-success">
-          <small>✅ All booking types available</small>
-        </div>
-        <div class="mt-2">
-          <small class="text-muted">Hourly, Day, Week, and Month bookings are all available for this date.</small>
+        <div class="plan-availability">
+          <span class="plan-status available">
+            Hourly ✅ $${(resource.hourly_rate_cents/100).toFixed(0)}/hr
+          </span>
+          <span class="plan-status available">
+            Day ✅ $${(resource.day_rate_cents/100).toFixed(0)}
+          </span>
+          <span class="plan-status available">
+            Week ✅ $${(resource.week_rate_cents/100).toFixed(0)}
+          </span>
+          <span class="plan-status available">
+            Month ✅ $${(resource.month_rate_cents/100).toFixed(0)}
+          </span>
         </div>
       </div>
     `;
-    detailsDiv.style.display = 'block';
-  }
+  });
+  
+  detailsHTML += '</div>';
+  detailsDiv.innerHTML = detailsHTML;
+  detailsDiv.style.display = 'block';
 }
 
 function previousMonth() {
