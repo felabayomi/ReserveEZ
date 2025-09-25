@@ -2478,6 +2478,220 @@ def manual_check_pass_notifications():
         <p><a href="/">← Back to EasyDesk</a></p>
         """
 
+@app.get("/admin/email-management")
+def admin_email_management():
+    """Admin interface for email management and manual triggers"""
+    return f"""
+    <html>
+    <head>
+        <title>Admin Email Management - EasyDesk</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+        <style>
+            .email-card {{ margin-bottom: 20px; }}
+            .trigger-section {{ background-color: #f8f9fa; padding: 20px; margin-bottom: 20px; border-radius: 8px; }}
+        </style>
+    </head>
+    <body>
+        <div class="container mt-4">
+            <h2>📧 Email Management Center</h2>
+            <p class="text-muted">Manage and trigger email notifications for EasyDesk booking system</p>
+            
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="trigger-section">
+                        <h4>🤖 Automatic Email Checks</h4>
+                        <p class="text-muted">Check and send automated emails that are due</p>
+                        <a href="/check-reminders" class="btn btn-primary me-2">Check Booking Reminders</a>
+                        <a href="/check-pass-notifications" class="btn btn-info">Check Pass Notifications</a>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <div class="trigger-section">
+                        <h4>📊 Admin Reports</h4>
+                        <p class="text-muted">Generate daily summaries and reports</p>
+                        <a href="/send-daily-summary" class="btn btn-secondary me-2">Send Today's Summary</a>
+                        <a href="/send-daily-summary/2025-09-24" class="btn btn-outline-secondary">Yesterday's Summary</a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row">
+                <div class="col-12">
+                    <div class="trigger-section">
+                        <h4>📬 Manual Email Triggers</h4>
+                        <p class="text-muted">Send specific emails manually (requires booking/pass IDs)</p>
+                        
+                        <div class="row">
+                            <div class="col-md-4">
+                                <h6>Payment & Refund Emails</h6>
+                                <div class="mb-3">
+                                    <button class="btn btn-outline-danger btn-sm w-100" onclick="sendPaymentFailure()">Send Payment Failure</button>
+                                </div>
+                                <div class="mb-3">
+                                    <button class="btn btn-outline-success btn-sm w-100" onclick="sendRefundConfirmation()">Send Refund Confirmation</button>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <h6>Booking Change Emails</h6>
+                                <div class="mb-3">
+                                    <button class="btn btn-outline-warning btn-sm w-100" onclick="sendCancellation()">Send Booking Cancellation</button>
+                                </div>
+                                <div class="mb-3">
+                                    <button class="btn btn-outline-info btn-sm w-100" onclick="sendModification()">Send Booking Modification</button>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <h6>Customer Emails</h6>
+                                <div class="mb-3">
+                                    <button class="btn btn-outline-primary btn-sm w-100" onclick="sendWelcome()">Send Welcome Email</button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="alert alert-warning mt-3">
+                            <strong>Note:</strong> Manual trigger buttons require JavaScript prompts to gather booking/pass IDs and other required parameters. 
+                            For production use, these would be integrated into the admin booking management interface.
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row">
+                <div class="col-12">
+                    <div class="trigger-section">
+                        <h4>📈 Email System Status</h4>
+                        <div class="row">
+                            <div class="col-md-3 text-center">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h5 class="card-title text-success">✅ Automatic</h5>
+                                        <p class="card-text">
+                                            • Booking Confirmations<br>
+                                            • 24h/2h Reminders<br>
+                                            • Pass Purchase/Expiry
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 text-center">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h5 class="card-title text-warning">🔧 Manual</h5>
+                                        <p class="card-text">
+                                            • Payment Failures<br>
+                                            • Refund Confirmations<br>
+                                            • Booking Changes
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 text-center">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h5 class="card-title text-info">🎯 Admin</h5>
+                                        <p class="card-text">
+                                            • Welcome Emails<br>
+                                            • Daily Summaries<br>
+                                            • Customer Onboarding
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 text-center">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h5 class="card-title text-primary">📧 SendGrid</h5>
+                                        <p class="card-text">
+                                            • Dual Recipients<br>
+                                            • Professional Templates<br>
+                                            • Error Tracking
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <p class="text-center mt-4">
+                <a href="/" class="btn btn-outline-primary">← Back to EasyDesk</a>
+            </p>
+        </div>
+        
+        <script>
+            function sendPaymentFailure() {{
+                const bookingId = prompt("Enter Booking or Pass ID for payment failure email:");
+                if (bookingId) {{
+                    alert("Payment failure email functionality would trigger here with ID: " + bookingId);
+                    // In production: fetch(`/admin/send-payment-failure/${{bookingId}}`)
+                }}
+            }}
+            
+            function sendRefundConfirmation() {{
+                const bookingId = prompt("Enter Booking or Pass ID for refund confirmation:");
+                const amount = prompt("Enter refund amount in cents (e.g., 2500 for $25.00):");
+                if (bookingId && amount) {{
+                    alert(`Refund confirmation would be sent for ID: ${{bookingId}}, Amount: ${{amount}} cents`);
+                    // In production: fetch(`/admin/send-refund/${{bookingId}}/${{amount}}`)
+                }}
+            }}
+            
+            function sendCancellation() {{
+                const bookingId = prompt("Enter Booking ID for cancellation email:");
+                if (bookingId) {{
+                    alert("Cancellation email functionality would trigger here with Booking ID: " + bookingId);
+                    // In production: fetch(`/admin/send-cancellation/${{bookingId}}`)
+                }}
+            }}
+            
+            function sendModification() {{
+                const bookingId = prompt("Enter Booking ID for modification email:");
+                if (bookingId) {{
+                    alert("Modification email functionality would trigger here with Booking ID: " + bookingId);
+                    // In production: fetch(`/admin/send-modification/${{bookingId}}`)
+                }}
+            }}
+            
+            function sendWelcome() {{
+                const email = prompt("Enter customer email for welcome email:");
+                const name = prompt("Enter customer name (optional):");
+                if (email) {{
+                    alert(`Welcome email would be sent to: ${{email}} ${{name ? 'Name: ' + name : ''}}`);
+                    // In production: fetch(`/admin/send-welcome/${{email}}/${{name}}`)
+                }}
+            }}
+        </script>
+    </body>
+    </html>
+    """
+
+@app.get("/send-daily-summary")
+@app.get("/send-daily-summary/<date>")
+def manual_send_daily_summary(date=None):
+    """Manually send daily summary email"""
+    result = send_daily_summary_email(date if date else "")
+    
+    if result:
+        return f"""
+        <h2>✅ Daily Summary Sent Successfully</h2>
+        <p>Daily summary email for {date if date else 'today'} has been sent to admin.</p>
+        <hr>
+        <p><a href="/admin/email-management">← Back to Email Management</a></p>
+        <p><a href="/">← Back to EasyDesk</a></p>
+        """
+    else:
+        return f"""
+        <h2>❌ Daily Summary Failed</h2>
+        <p>Failed to send daily summary email. Check server logs for details.</p>
+        <hr>
+        <p><a href="/admin/email-management">← Back to Email Management</a></p>
+        <p><a href="/">← Back to EasyDesk</a></p>
+        """, 500
+
 @app.get("/api/availability/<date>")
 def api_availability(date):
     """API endpoint to get comprehensive availability data for the calendar"""
