@@ -216,7 +216,7 @@ def send_booking_confirmation_email(booking):
                     </tr>
                     <tr style="border-bottom: 1px solid #dee2e6;">
                         <td style="padding: 8px 0; font-weight: bold; color: #6c757d;">Customer:</td>
-                        <td style="padding: 8px 0;">{booking.customer_email}</td>
+                        <td style="padding: 8px 0;">{booking.email}</td>
                     </tr>
                     <tr style="border-bottom: 1px solid #dee2e6;">
                         <td style="padding: 8px 0; font-weight: bold; color: #6c757d;">Date & Time:</td>
@@ -228,11 +228,11 @@ def send_booking_confirmation_email(booking):
                     </tr>
                     <tr style="border-bottom: 1px solid #dee2e6;">
                         <td style="padding: 8px 0; font-weight: bold; color: #6c757d;">Seats:</td>
-                        <td style="padding: 8px 0;">{booking.num_seats}</td>
+                        <td style="padding: 8px 0;">{booking.seats}</td>
                     </tr>
                     <tr>
                         <td style="padding: 8px 0; font-weight: bold; color: #6c757d;">Total:</td>
-                        <td style="padding: 8px 0; font-weight: bold; color: #28a745;">{as_money(booking.total_cost_cents)}</td>
+                        <td style="padding: 8px 0; font-weight: bold; color: #28a745;">{as_money(booking.amount_cents)}</td>
                     </tr>
                 </table>
             </div>
@@ -255,7 +255,7 @@ def send_booking_confirmation_email(booking):
         # Customer email
         customer_message = Mail(
             from_email=Email("billing@citydiscoverer.ai", "EasyDesk Booking System"),
-            to_emails=To(booking.customer_email),
+            to_emails=To(booking.email),
             subject=subject,
             html_content=Content("text/html", html_content)
         )
