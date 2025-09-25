@@ -137,13 +137,31 @@
             <td>{{ p.provider.title() }}</td>
             <td>{{ as_money(p.amount_cents) }}</td>
             <td>
-              <span class="badge {{ 'bg-success' if p.status == 'paid' else 'bg-warning' if p.status == 'pending' else 'bg-secondary' }}">
+              <span class="badge {{ 'bg-success' if p.status == 'paid' else 'bg-info' if p.status == 'authorized' else 'bg-warning' if p.status == 'pending' else 'bg-secondary' }}">
                 {{ p.status.upper() }}
               </span>
             </td>
             <td>{{ p.intent_id or '-' }}</td>
             <td>
-              {% if p.status != 'paid' %}
+              {% if p.status == 'authorized' and p.provider == 'stripe_auth' %}
+              <!-- Authorization hold controls -->
+              <div class="btn-group btn-group-sm" role="group">
+                <form method="post" action="/admin/payment-capture" class="d-inline">
+                  <input type="hidden" name="key" value="{{ key }}">
+                  <input type="hidden" name="pid" value="{{ p.id }}">
+                  <button class="btn btn-success" title="Capture payment (charge customer)">
+                    💳 Capture
+                  </button>
+                </form>
+                <form method="post" action="/admin/payment-void" class="d-inline">
+                  <input type="hidden" name="key" value="{{ key }}">
+                  <input type="hidden" name="pid" value="{{ p.id }}">
+                  <button class="btn btn-outline-secondary" title="Void authorization (release hold)">
+                    ❌ Void
+                  </button>
+                </form>
+              </div>
+              {% elif p.status != 'paid' %}
               <form method="post" action="/admin/payment-mark-paid" class="d-inline">
                 <input type="hidden" name="key" value="{{ key }}">
                 <input type="hidden" name="pid" value="{{ p.id }}">

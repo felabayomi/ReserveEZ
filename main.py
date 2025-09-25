@@ -3206,6 +3206,78 @@ def admin_payment_mark_paid():
     db.session.commit()
     return redirect(url_for("admin_home", key=request.form["key"]))
 
+@app.post("/admin/payment-capture")
+def admin_payment_capture():
+    """Capture an authorization hold (charge the customer)"""
+    admin_guard()
+    pid = int(request.form["pid"])
+    
+    payment = Payment.query.get_or_404(pid)
+    
+    if payment.status != "authorized" or payment.provider != "stripe_auth":
+        flash("Payment is not an active authorization hold.", "error")
+        return redirect(url_for("admin_home", key=request.form["key"]))
+    
+    try:
+        # Capture the payment intent
+        stripe.PaymentIntent.capture(payment.intent_id)
+        
+        # Update payment status
+        payment.status = "paid"
+        
+        # Update associated booking status
+        if payment.booking_id:
+            booking = Booking.query.get(payment.booking_id)
+            if booking:
+                booking.status = "paid"
+        
+        # Update associated pass status
+        if payment.pass_id:
+            pass_obj = Pass.query.get(payment.pass_id)
+            if pass_obj:
+                pass_obj.status = "active"
+        
+        db.session.commit()
+        flash("Authorization hold captured successfully. Customer has been charged.", "success")
+        
+    except Exception as e:
+        flash(f"Failed to capture authorization: {str(e)}", "error")
+    
+    return redirect(url_for("admin_home", key=request.form["key"]))
+
+@app.post("/admin/payment-void")
+def admin_payment_void():
+    """Void an authorization hold (release without charge)"""
+    admin_guard()
+    pid = int(request.form["pid"])
+    
+    payment = Payment.query.get_or_404(pid)
+    
+    if payment.status != "authorized" or payment.provider != "stripe_auth":
+        flash("Payment is not an active authorization hold.", "error")
+        return redirect(url_for("admin_home", key=request.form["key"]))
+    
+    try:
+        # Cancel the payment intent (void the authorization)
+        stripe.PaymentIntent.cancel(payment.intent_id)
+        
+        # Update payment status
+        payment.status = "voided"
+        
+        # Update associated booking status to cancelled
+        if payment.booking_id:
+            booking = Booking.query.get(payment.booking_id)
+            if booking:
+                booking.status = "cancelled"
+        
+        db.session.commit()
+        flash("Authorization hold voided successfully. No charge was made.", "success")
+        
+    except Exception as e:
+        flash(f"Failed to void authorization: {str(e)}", "error")
+    
+    return redirect(url_for("admin_home", key=request.form["key"]))
+
 @app.post("/admin/pass-expire")
 def admin_pass_expire():
     admin_guard()
