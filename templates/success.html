@@ -1,5 +1,25 @@
 {% extends "base.html" %}
 {% block content %}
+
+<!-- Google Ads Conversion Tracking -->
+{% if booking and booking.status in ['paid', 'free'] %}
+  <!-- Event snippet for Book appointment conversion page -->
+  <script>
+    gtag('event', 'conversion', {'send_to': 'AW-17132565756/WlG3CKCx9aEbEPzpuOk_'});
+  </script>
+  
+  {% if booking.amount_cents > 0 %}
+    <!-- Event snippet for Purchase conversion page -->
+    <script>
+      gtag('event', 'conversion', {
+          'send_to': 'AW-17132565756/MeYZCLmv9aEbEPzpuOk_',
+          'value': {{ booking.amount_cents / 100 }},
+          'currency': 'USD',
+          'transaction_id': '{{ booking.id }}'
+      });
+    </script>
+  {% endif %}
+{% endif %}
 <div class="alert alert-success">
   <h4 class="alert-heading">Booking confirmed!</h4>
   {% if booking %}
