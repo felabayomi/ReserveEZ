@@ -113,9 +113,13 @@ class Booking(db.Model):
 def initialize_database():
     """Initialize database with proper error handling"""
     with app.app_context():
-        # Force drop and recreate all tables for schema changes
-        db.drop_all()
-        db.create_all()
+        # For deployment, try to create tables without dropping first
+        try:
+            db.create_all()
+        except Exception:
+            # If that fails, try drop and recreate (development)
+            db.drop_all()
+            db.create_all()
         
         # Check if we need to seed data
         if Resource.query.count() == 0:
@@ -175,8 +179,17 @@ def initialize_database():
             db.session.add_all(resources)
             db.session.commit()
 
-# Initialize database on startup
-initialize_database()
+# Initialize database on startup (with error handling for deployment)
+try:
+    initialize_database()
+except Exception as e:
+    print(f"Warning: Database initialization failed: {e}")
+    # Try to create tables without dropping for deployment
+    try:
+        with app.app_context():
+            db.create_all()
+    except Exception as e2:
+        print(f"Error: Could not create database tables: {e2}")
 
 # ---------------- Helper Functions ----------------
 def parse_dt(date_str, time_str):
@@ -3323,5 +3336,15 @@ def admin_pass_expire():
 def mock_mercury_checkout():
     return render_template("mock_mercury.html")
 
+# Health check endpoint for deployment
+@app.get("/health")
+def health_check():
+    """Simple health check for deployment"""
+    return {"status": "healthy", "service": "easydesk"}, 200
+
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    # Use different configurations for development vs production
+    import os
+    debug_mode = os.getenv('FLASK_ENV') != 'production'
+    port = int(os.getenv('PORT', 5000))
+    app.run(host="0.0.0.0", port=port, debug=debug_mode)

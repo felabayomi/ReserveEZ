@@ -4,11 +4,7 @@ python-dotenv==1.0.1
 qrcode==7.4.2
 Pillow==10.4.0
 requests==2.31.0
-flask
-flask_sqlalchemy
-Pillow
-python-dotenv
-qrcode
-requests
 stripe
 sendgrid
+gunicorn==21.2.0
+gunicorn
