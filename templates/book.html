@@ -41,6 +41,20 @@
   </ol>
 </nav>
 
+<!-- Advance Booking Requirement Notice -->
+<div class="alert alert-info border-0 mb-4" style="background: linear-gradient(135deg, #cfe2ff 0%, #f0f6ff 100%);">
+  <div class="d-flex align-items-start">
+    <div class="me-2" style="font-size: 1.2rem;">ℹ️</div>
+    <div>
+      <strong>Advance Booking Required</strong>
+      <p class="mb-0 small mt-1">
+        Bookings must be made at least 1 day in advance. 
+        If it's after 5pm EST, please book 2 days ahead to ensure we can prepare your workspace.
+      </p>
+    </div>
+  </div>
+</div>
+
 {% if flow_type == 'plan-first' and pre_selected_plan %}
 <!-- Plan-First Flow: Resource selection directly -->
 <div class="row mb-4">
@@ -76,7 +90,7 @@
 <div class="row g-3 mb-4">
   <div class="col-auto">
     <label class="form-label">See availability for:</label>
-    <input type="date" id="selected-date" value="{{ date }}" class="form-control">
+    <input type="date" id="selected-date" value="{{ date }}" min="{{ min_date }}" class="form-control">
   </div>
   <div class="col-auto align-self-end">
     <button class="btn btn-outline-secondary" onclick="showAvailabilityCalendar()">Show availability</button>
@@ -145,7 +159,7 @@
 <form method="get" action="/book" class="row g-3 mb-4">
   <div class="col-auto">
     <label class="form-label">See availability for:</label>
-    <input type="date" name="date" value="{{ date }}" class="form-control">
+    <input type="date" name="date" value="{{ date }}" min="{{ min_date }}" class="form-control">
   </div>
   <div class="col-auto align-self-end">
     <button class="btn btn-outline-secondary">Show availability</button>
@@ -1162,7 +1176,7 @@ function showBookingDetails() {
       <div class="row g-3 mb-4">
         <div class="col-md-4">
           <label class="form-label">Date</label>
-          <input type="date" name="booking_date" value="{{ date }}" class="form-control" readonly>
+          <input type="date" name="booking_date" value="{{ date }}" min="{{ min_date }}" class="form-control" readonly>
         </div>
         <div class="col-md-4">
           <label class="form-label">Start time *</label>
@@ -1185,7 +1199,7 @@ function showBookingDetails() {
       <div class="row g-3 mb-4">
         <div class="col-md-6">
           <label class="form-label">Date *</label>
-          <input required type="date" name="booking_date" value="{{ date }}" class="form-control" onchange="updateSummary()">
+          <input required type="date" name="booking_date" min="{{ min_date }}" value="{{ date }}" class="form-control" onchange="updateSummary()">
         </div>
         <div class="col-md-6">
           <label class="form-label">Seats *</label>
@@ -1200,7 +1214,7 @@ function showBookingDetails() {
       <div class="row g-3 mb-4">
         <div class="col-md-6">
           <label class="form-label">Start date *</label>
-          <input required type="date" name="start_date" value="{{ date }}" class="form-control" onchange="updateSummary()">
+          <input required type="date" name="start_date" min="{{ min_date }}" value="{{ date }}" class="form-control" onchange="updateSummary()">
           <div class="form-text">7 consecutive days starting from this date</div>
         </div>
         <div class="col-md-6">
@@ -1216,7 +1230,7 @@ function showBookingDetails() {
       <div class="row g-3 mb-4">
         <div class="col-md-6">
           <label class="form-label">Start date *</label>
-          <input required type="date" name="start_date" value="{{ date }}" class="form-control" onchange="updateSummary()">
+          <input required type="date" name="start_date" min="{{ min_date }}" value="{{ date }}" class="form-control" onchange="updateSummary()">
           <div class="form-text">30 consecutive days starting from this date</div>
         </div>
         <div class="col-md-6">

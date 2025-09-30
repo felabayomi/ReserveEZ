@@ -200,6 +200,29 @@ def parse_dt(date_str, time_str):
 def as_money(cents):
     return f"${Decimal(cents) / Decimal(100):.2f}"
 
+def get_minimum_bookable_date():
+    """Calculate minimum bookable date based on EST time with cutoff rules:
+    - Before 5pm EST: can book for tomorrow (1 day ahead)
+    - After 5pm EST: can book for 2 days ahead
+    """
+    import pytz
+    
+    # Get current time in EST
+    est = pytz.timezone('US/Eastern')
+    now_est = dt.datetime.now(est)
+    
+    # Check if it's after 5pm EST
+    cutoff_hour = 17  # 5pm
+    
+    if now_est.hour >= cutoff_hour:
+        # After 5pm: minimum is 2 days ahead
+        min_date = now_est.date() + dt.timedelta(days=2)
+    else:
+        # Before 5pm: minimum is tomorrow (1 day ahead)
+        min_date = now_est.date() + dt.timedelta(days=1)
+    
+    return min_date
+
 def send_booking_confirmation_email(booking):
     """Send booking confirmation email to user and admin using SendGrid"""
     if not SENDGRID_API_KEY:
@@ -2055,7 +2078,19 @@ def policies():
 @app.get("/book")
 def book_page():
     resources = Resource.query.filter_by(active=True).all()
-    date = request.args.get("date") or dt.date.today().isoformat()
+    
+    # Calculate minimum bookable date
+    min_date = get_minimum_bookable_date()
+    min_date_str = min_date.isoformat()
+    
+    # Get requested date or use minimum date
+    date = request.args.get("date") or min_date_str
+    
+    # Enforce minimum date
+    requested_date = dt.datetime.strptime(date, "%Y-%m-%d").date()
+    if requested_date < min_date:
+        date = min_date_str
+    
     pre_selected_plan = request.args.get("plan")  # Get pre-selected plan from URL
     flow_type = request.args.get("flow", "workspace-first")  # Default to workspace-first
     grouped = day_bookings(date)
@@ -2084,7 +2119,8 @@ def book_page():
     return render_template("book.html", 
                          resources=resources, 
                          promo=PROMO_CODE, 
-                         date=date, 
+                         date=date,
+                         min_date=min_date_str,
                          grouped=grouped,
                          capacity_info=capacity_info,
                          as_money=as_money,
@@ -2115,6 +2151,13 @@ def handle_plan_booking(email, name, resource_id, plan_type, seats, code, paymen
     
     # Parse plan-specific date/time fields
     start_dt, end_dt, hours = parse_plan_dates(plan_type, resource)
+    
+    # Enforce minimum booking date requirement
+    min_date = get_minimum_bookable_date()
+    booking_date = start_dt.date()
+    if booking_date < min_date:
+        flash(f"Sorry, bookings must be made at least 1 day in advance. The earliest available date is {min_date.strftime('%A, %B %d')}.", "warning")
+        return redirect(url_for("book_page"))
     
     # Validate availability
     is_valid, error_msg = validate_booking_availability(
