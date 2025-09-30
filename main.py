@@ -2084,11 +2084,18 @@ def book_page():
     min_date_str = min_date.isoformat()
     
     # Get requested date or use minimum date
-    date = request.args.get("date") or min_date_str
-    
-    # Enforce minimum date
-    requested_date = dt.datetime.strptime(date, "%Y-%m-%d").date()
-    if requested_date < min_date:
+    requested_date = request.args.get("date")
+    if requested_date:
+        # Validate requested date is not before minimum
+        try:
+            req_date_obj = dt.datetime.strptime(requested_date, "%Y-%m-%d").date()
+            if req_date_obj < min_date:
+                date = min_date_str
+            else:
+                date = requested_date
+        except ValueError:
+            date = min_date_str
+    else:
         date = min_date_str
     
     pre_selected_plan = request.args.get("plan")  # Get pre-selected plan from URL
