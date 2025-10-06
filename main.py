@@ -97,6 +97,15 @@ class Payment(db.Model):
     currency = db.Column(db.String(3), default="usd")
     created_at = db.Column(db.DateTime, default=dt.datetime.utcnow)
 
+class PromoCode(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    code = db.Column(db.String(40), unique=True, nullable=False, index=True)
+    discount_type = db.Column(db.String(20), nullable=False)  # "percent" or "free"
+    discount_value = db.Column(db.Integer, nullable=False)  # percentage (1-100) or 100 for free
+    active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=dt.datetime.utcnow)
+    usage_count = db.Column(db.Integer, default=0)
+
 class Booking(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(200), nullable=False, index=True)
@@ -185,6 +194,29 @@ def initialize_database():
             whole_room.opening_hours = json.dumps(default_hours)
             resources.append(whole_room)
             db.session.add_all(resources)
+            db.session.commit()
+        
+        # Seed default promo codes if none exist
+        if PromoCode.query.count() == 0:
+            promo_codes = []
+            
+            # Legacy EASYWEEK code - 100% off
+            easyweek = PromoCode()
+            easyweek.code = "EASYWEEK"
+            easyweek.discount_type = "free"
+            easyweek.discount_value = 100
+            easyweek.active = True
+            promo_codes.append(easyweek)
+            
+            # New WELCOME20 code - 20% off
+            welcome20 = PromoCode()
+            welcome20.code = "WELCOME20"
+            welcome20.discount_type = "percent"
+            welcome20.discount_value = 20
+            welcome20.active = True
+            promo_codes.append(welcome20)
+            
+            db.session.add_all(promo_codes)
             db.session.commit()
 
 # Initialize database on startup (with error handling for deployment)
@@ -2201,11 +2233,14 @@ def handle_plan_booking(email, name, resource_id, plan_type, seats, code, paymen
         status = "free"
         promo_used = None
     else:
-        # Check promo code
+        # Check promo code from database
         promo_used = None
-        if code and code in PROMO_CODES:
-            if not user_has_used_promo(email, code):
-                discount_type, discount_value = PROMO_CODES[code]
+        if code:
+            promo = PromoCode.query.filter_by(code=code.upper(), active=True).first()
+            if promo and not user_has_used_promo(email, code):
+                discount_type = promo.discount_type
+                discount_value = promo.discount_value
+                
                 if discount_type == "free":
                     amount_cents = 0
                     status = "free"
@@ -2216,6 +2251,10 @@ def handle_plan_booking(email, name, resource_id, plan_type, seats, code, paymen
                     amount_cents = amount_cents - discount_amount
                     status = "reserved"
                     promo_used = code
+                
+                # Increment usage count
+                promo.usage_count += 1
+                db.session.commit()
             else:
                 status = "reserved"
         else:
@@ -3198,6 +3237,7 @@ def admin_home():
     latest_bookings = Booking.query.order_by(Booking.created_at.desc()).limit(20).all()
     active_passes = Pass.query.filter_by(status="active").order_by(Pass.valid_to.desc()).all()
     payments = Payment.query.order_by(Payment.created_at.desc()).limit(20).all()
+    promo_codes = PromoCode.query.order_by(PromoCode.active.desc(), PromoCode.created_at.desc()).all()
     
     totals = {
         "paid": sum(b.amount_cents for b in Booking.query.filter_by(status="paid")),
@@ -3209,6 +3249,7 @@ def admin_home():
                          latest_bookings=latest_bookings,
                          active_passes=active_passes,
                          payments=payments,
+                         promo_codes=promo_codes,
                          totals=totals, 
                          key=request.args.get("key"),
                          as_money=as_money)
@@ -3418,6 +3459,61 @@ def admin_pass_expire():
     pass_obj = Pass.query.get_or_404(pid)
     pass_obj.status = "expired"
     db.session.commit()
+    return redirect(url_for("admin_home", key=request.form["key"]))
+
+@app.post("/admin/promo-code")
+def admin_promo_code_create():
+    admin_guard()
+    code = request.form["code"].strip().upper()
+    discount_type = request.form["discount_type"]
+    discount_value = int(request.form["discount_value"])
+    
+    # Validate discount value
+    if discount_type == "percent" and (discount_value < 1 or discount_value > 100):
+        flash("Percentage discount must be between 1 and 100", "error")
+        return redirect(url_for("admin_home", key=request.form["key"]))
+    
+    # Check if code already exists
+    existing = PromoCode.query.filter_by(code=code).first()
+    if existing:
+        flash(f"Promo code {code} already exists", "error")
+        return redirect(url_for("admin_home", key=request.form["key"]))
+    
+    promo = PromoCode()
+    promo.code = code
+    promo.discount_type = discount_type
+    promo.discount_value = discount_value
+    promo.active = True
+    
+    db.session.add(promo)
+    db.session.commit()
+    flash(f"Promo code {code} created successfully!", "success")
+    return redirect(url_for("admin_home", key=request.form["key"]))
+
+@app.post("/admin/promo-code-toggle")
+def admin_promo_code_toggle():
+    admin_guard()
+    promo_id = int(request.form["promo_id"])
+    promo = PromoCode.query.get_or_404(promo_id)
+    promo.active = not promo.active
+    db.session.commit()
+    return redirect(url_for("admin_home", key=request.form["key"]))
+
+@app.post("/admin/promo-code-delete")
+def admin_promo_code_delete():
+    admin_guard()
+    promo_id = int(request.form["promo_id"])
+    promo = PromoCode.query.get_or_404(promo_id)
+    
+    # Check usage
+    usage_count = Booking.query.filter_by(promo_applied=promo.code).count()
+    if usage_count > 0:
+        flash(f"Cannot delete {promo.code} - it has been used {usage_count} times. Deactivate it instead.", "error")
+    else:
+        db.session.delete(promo)
+        db.session.commit()
+        flash(f"Promo code {promo.code} deleted successfully.", "success")
+    
     return redirect(url_for("admin_home", key=request.form["key"]))
 
 # Mock Mercury checkout for testing
