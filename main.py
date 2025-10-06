@@ -26,6 +26,14 @@ PROMO_CODE = os.getenv("PROMO_CODE", "EASYWEEK").strip().upper()
 USE_MERCURY = os.getenv("USE_MERCURY", "true").lower() == "true"
 ALLOW_POS_CHECKOUT = os.getenv("ALLOW_POS_CHECKOUT", "true").lower() == "true"
 
+# Promo codes configuration: code -> (discount_type, discount_value)
+# discount_type can be "percent" or "free" (100% off)
+PROMO_CODES = {
+    "EASYWEEK": ("free", 100),  # Legacy code - 100% off
+    "WELCOME20": ("percent", 20),  # New code - 20% off
+}
+ACTIVE_PROMO_CODE = "WELCOME20"  # Code to display on frontend
+
 # Stripe configuration
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 STRIPE_PUBLIC_KEY = os.getenv("STRIPE_PUBLIC_KEY", "pk_test_placeholder")
@@ -1381,7 +1389,7 @@ def send_welcome_email(email, customer_name=""):
                 <h4 style="margin: 0 0 10px 0; color: #155724;">🚀 Getting Started</h4>
                 <ul style="margin: 0; padding-left: 20px; color: #155724;">
                     <li>Book by the hour or purchase a day/week/month pass</li>
-                    <li>Use promo code <strong>EASYWEEK</strong> for 100% off your first booking!</li>
+                    <li>Use promo code <strong>WELCOME20</strong> for 20% off your first booking!</li>
                     <li>Passes give unlimited bookings during valid periods</li>
                     <li>Cancel and reschedule easily within our system</li>
                 </ul>
@@ -2133,7 +2141,7 @@ def book_page():
     
     return render_template("book.html", 
                          resources=resources, 
-                         promo=PROMO_CODE, 
+                         promo=ACTIVE_PROMO_CODE, 
                          date=date,
                          min_date=min_date_str,
                          grouped=grouped,
@@ -2191,12 +2199,25 @@ def handle_plan_booking(email, name, resource_id, plan_type, seats, code, paymen
     if user_pass:
         amount_cents = 0
         status = "free"
+        promo_used = None
     else:
         # Check promo code
-        apply_free = (code == PROMO_CODE) and not user_has_used_promo(email, PROMO_CODE)
-        if apply_free:
-            amount_cents = 0
-            status = "free"
+        promo_used = None
+        if code and code in PROMO_CODES:
+            if not user_has_used_promo(email, code):
+                discount_type, discount_value = PROMO_CODES[code]
+                if discount_type == "free":
+                    amount_cents = 0
+                    status = "free"
+                    promo_used = code
+                elif discount_type == "percent":
+                    # Apply percentage discount
+                    discount_amount = int(amount_cents * (discount_value / 100))
+                    amount_cents = amount_cents - discount_amount
+                    status = "reserved"
+                    promo_used = code
+            else:
+                status = "reserved"
         else:
             status = "reserved"
     
@@ -2212,7 +2233,7 @@ def handle_plan_booking(email, name, resource_id, plan_type, seats, code, paymen
     booking.hours = hours if plan_type == "hour" else calculate_hours_from_range(start_dt, end_dt, resource)
     booking.amount_cents = amount_cents
     booking.status = status
-    booking.promo_applied = PROMO_CODE if (code == PROMO_CODE and amount_cents == 0) else None
+    booking.promo_applied = promo_used
     
     db.session.add(booking)
     db.session.commit()
