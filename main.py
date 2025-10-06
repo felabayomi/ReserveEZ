@@ -3196,6 +3196,13 @@ def admin_resource():
     resource.hourly_rate_cents = rate
     resource.capacity = capacity
     resource.active = True
+    
+    # Set default pass rates based on hourly rate (can be edited later)
+    # Day pass = 3x hourly rate, Week = 12x, Month = 30x
+    resource.day_rate_cents = rate * 3
+    resource.week_rate_cents = rate * 12
+    resource.month_rate_cents = rate * 30
+    
     default_hours = {
         "mon": [["09:00", "18:00"]], "tue": [["09:00", "18:00"]], 
         "wed": [["09:00", "18:00"]], "thu": [["09:00", "18:00"]], 
@@ -3224,6 +3231,9 @@ def admin_resource_update(rid):
     
     resource.name = request.form["name"].strip()
     resource.hourly_rate_cents = int(float(request.form["rate"]) * 100)
+    resource.day_rate_cents = int(float(request.form["day_rate"]) * 100)
+    resource.week_rate_cents = int(float(request.form["week_rate"]) * 100)
+    resource.month_rate_cents = int(float(request.form["month_rate"]) * 100)
     resource.capacity = int(request.form["capacity"])
     resource.active = "active" in request.form
     
