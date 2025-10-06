@@ -2065,7 +2065,15 @@ def calculate_plan_duration(resource, plan_type, start_dt, hours=None):
 @app.get("/")
 def index():
     resources = Resource.query.filter_by(active=True).all()
-    return render_template("index.html", resources=resources)
+    
+    # Calculate minimum prices for each plan type across all active resources
+    min_prices = {
+        'day': min([r.day_rate_cents for r in resources]) if resources else 1500,
+        'week': min([r.week_rate_cents for r in resources]) if resources else 6000,
+        'month': min([r.month_rate_cents for r in resources]) if resources else 15000
+    }
+    
+    return render_template("index.html", resources=resources, min_prices=min_prices, as_money=as_money)
 
 @app.get("/about")
 def about():

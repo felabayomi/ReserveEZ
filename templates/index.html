@@ -129,7 +129,7 @@
                 <p class="card-text">Full day access within our business hours.</p>
                 <div class="pricing-examples">
                   <small class="text-muted">Starting from</small>
-                  <div class="price-display"><strong>$15</strong>/day</div>
+                  <div class="price-display"><strong>{{ as_money(min_prices.day) }}</strong>/day</div>
                 </div>
                 <div class="mt-3">
                   <span class="badge bg-success">Best for full days</span>
@@ -146,7 +146,7 @@
                 <p class="card-text">7 consecutive days of unlimited access.</p>
                 <div class="pricing-examples">
                   <small class="text-muted">Starting from</small>
-                  <div class="price-display"><strong>$60</strong>/week</div>
+                  <div class="price-display"><strong>{{ as_money(min_prices.week) }}</strong>/week</div>
                 </div>
                 <div class="mt-3">
                   <span class="badge bg-warning text-dark">Great value</span>
@@ -163,7 +163,7 @@
                 <p class="card-text">30 consecutive days of unlimited access.</p>
                 <div class="pricing-examples">
                   <small class="text-muted">Starting from</small>
-                  <div class="price-display"><strong>$150</strong>/month</div>
+                  <div class="price-display"><strong>{{ as_money(min_prices.month) }}</strong>/month</div>
                 </div>
                 <div class="mt-3">
                   <span class="badge bg-primary">Best value</span>
