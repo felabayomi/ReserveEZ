@@ -60,8 +60,9 @@ Simplified calendar interface: Only today shown in olive green, all other dates 
 
 ### Development Tools
 - **Bootstrap 5.3.3**: Frontend UI framework via CDN
-- **Python libraries**: Flask, SQLAlchemy, python-dotenv, qrcode, Pillow, requests
+- **Python libraries**: Flask, SQLAlchemy, python-dotenv, qrcode, Pillow, requests, cairosvg
 - **Environment management**: .env file configuration for secrets and feature flags
+- **PWA support**: Web app manifest and mobile home screen icons (olive green desk theme)
 
 ### Email Notifications  
 - **SendGrid integration**: Automated booking confirmation emails sent on successful checkout

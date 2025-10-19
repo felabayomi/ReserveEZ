@@ -9,3 +9,4 @@ sendgrid
 gunicorn==21.2.0
 pytz
 pytz
+cairosvg
