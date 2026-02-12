@@ -5,9 +5,8 @@ qrcode==7.4.2
 Pillow==10.4.0
 requests==2.31.0
 stripe
-sendgrid
+resend
 gunicorn==21.2.0
-pytz
 pytz
 cairosvg
 itsdangerous

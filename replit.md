@@ -40,7 +40,7 @@ Branding: "ReserveEZ" (Reserve Table Easy), an Errand Easy company. All rights r
 - **Automatic refunds**: Full deposit refund for timely cancellations
 - **Promo code discounts**: Can reduce or waive deposits
 
-### Email System (SendGrid)
+### Email System (Resend)
 - **Booking confirmation**: Details, manage link, calendar export link
 - **24-hour reminder**: Confirm attendance button, cancellation link
 - **2-hour reminder**: Final reminder with no-show policy warning
@@ -73,22 +73,23 @@ Branding: "ReserveEZ" (Reserve Table Easy), an Errand Easy company. All rights r
 - **Stripe**: Deposits, card holds, no-show fee charging, refunds
 
 ### Email Services
-- **SendGrid**: All transactional emails (confirmations, reminders, notifications)
+- **Resend**: All transactional emails (confirmations, reminders, notifications)
 
 ### Frontend
 - **Bootstrap 5.3.3**: UI framework via CDN
 - **Stripe.js**: Client-side card element for secure payment
 
 ### Python Libraries
-- Flask, Flask-SQLAlchemy, psycopg2-binary, stripe, sendgrid, python-dotenv
+- Flask, Flask-SQLAlchemy, psycopg2-binary, stripe, resend, python-dotenv
 - itsdangerous (secure token generation), pytz, gunicorn, qrcode, Pillow
 
+### Integrations (Replit Connectors)
+- **Stripe**: Connected via Replit connector - credentials fetched automatically
+- **Resend**: Connected via Replit connector - API key and from_email fetched automatically
+
 ## Environment Variables
-- `DATABASE_URL` - PostgreSQL connection string
-- `STRIPE_SECRET_KEY` - Stripe secret key
-- `STRIPE_PUBLIC_KEY` - Stripe publishable key
+- `DATABASE_URL` - PostgreSQL connection string (auto-configured)
 - `STRIPE_WEBHOOK_SECRET` - Stripe webhook signing secret
-- `SENDGRID_API_KEY` - SendGrid API key
-- `SENDER_EMAIL` - From email address
 - `ADMIN_PASSWORD` - Admin panel password (default: "admin")
 - `FLASK_SECRET` - Flask session secret key
+- Stripe and Resend credentials are managed via Replit integrations (no manual env vars needed)

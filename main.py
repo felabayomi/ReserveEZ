@@ -1,12 +1,11 @@
-import os, datetime as dt, io, json, uuid, hmac, hashlib
+import os, datetime as dt, io, json, uuid, hmac, hashlib, requests as http_requests
 from decimal import Decimal
 from flask import (Flask, render_template, request, redirect, url_for, abort,
                    jsonify, send_file, flash, session, make_response)
 from flask_sqlalchemy import SQLAlchemy
 from dotenv import load_dotenv
 import stripe
-from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail, Email, To, Content
+import resend
 from itsdangerous import URLSafeTimedSerializer
 import pytz
 
@@ -20,13 +19,61 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {"pool_pre_ping": True, "pool_recycle"
 db = SQLAlchemy(app)
 
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin")
-stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
-STRIPE_PUBLIC_KEY = os.getenv("STRIPE_PUBLIC_KEY", "")
-STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
-SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
-SENDER_EMAIL = os.getenv("SENDER_EMAIL", "noreply@reserveez.com")
 SENDER_NAME = os.getenv("SENDER_NAME", "ReserveEZ")
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@reserveez.com")
+
+
+def _get_replit_token():
+    repl_id = os.getenv("REPL_IDENTITY")
+    depl_token = os.getenv("WEB_REPL_RENEWAL")
+    if repl_id:
+        return "repl " + repl_id
+    elif depl_token:
+        return "depl " + depl_token
+    return None
+
+
+def _get_connection_settings(connector_name):
+    hostname = os.getenv("REPLIT_CONNECTORS_HOSTNAME")
+    token = _get_replit_token()
+    if not hostname or not token:
+        return None
+    is_production = os.getenv("REPLIT_DEPLOYMENT") == "1"
+    env = "production" if is_production else "development"
+    url = f"https://{hostname}/api/v2/connection?include_secrets=true&connector_names={connector_name}&environment={env}"
+    try:
+        resp = http_requests.get(url, headers={"Accept": "application/json", "X_REPLIT_TOKEN": token}, timeout=10)
+        data = resp.json()
+        items = data.get("items", [])
+        return items[0] if items else None
+    except Exception as e:
+        print(f"[CONNECTOR] Failed to fetch {connector_name}: {e}")
+        return None
+
+
+def init_stripe():
+    conn = _get_connection_settings("stripe")
+    if conn and conn.get("settings"):
+        s = conn["settings"]
+        stripe.api_key = s.get("secret", "")
+        return s.get("publishable", ""), s.get("secret", "")
+    stripe.api_key = os.getenv("STRIPE_SECRET_KEY", "")
+    return os.getenv("STRIPE_PUBLIC_KEY", ""), os.getenv("STRIPE_SECRET_KEY", "")
+
+
+def init_resend():
+    conn = _get_connection_settings("resend")
+    if conn and conn.get("settings"):
+        s = conn["settings"]
+        resend.api_key = s.get("api_key", "")
+        return s.get("from_email", "noreply@reserveez.com")
+    resend.api_key = os.getenv("RESEND_API_KEY", "")
+    return os.getenv("SENDER_EMAIL", "noreply@reserveez.com")
+
+
+STRIPE_PUBLIC_KEY, _stripe_secret = init_stripe()
+SENDER_EMAIL = init_resend()
+STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
 
 YOUR_DOMAIN = os.getenv('REPLIT_DEV_DOMAIN', os.getenv('REPLIT_DOMAINS', 'localhost:5000').split(',')[0])
 BASE_URL = f"https://{YOUR_DOMAIN}"
@@ -283,18 +330,17 @@ def calculate_end_time(start_time, duration_minutes):
 # ──────────────── Email Helpers ────────────────
 
 def send_email(to_email, subject, html_content):
-    if not SENDGRID_API_KEY:
-        print(f"[EMAIL SKIP] No SendGrid key. Would send to {to_email}: {subject}")
+    if not resend.api_key:
+        print(f"[EMAIL SKIP] No Resend key. Would send to {to_email}: {subject}")
         return False
     try:
-        sg = SendGridAPIClient(SENDGRID_API_KEY)
-        message = Mail(
-            from_email=Email(SENDER_EMAIL, SENDER_NAME),
-            to_emails=To(to_email),
-            subject=subject,
-            html_content=Content("text/html", html_content)
-        )
-        sg.send(message)
+        params = {
+            "from": f"{SENDER_NAME} <{SENDER_EMAIL}>",
+            "to": [to_email],
+            "subject": subject,
+            "html": html_content,
+        }
+        resend.Emails.send(params)
         return True
     except Exception as e:
         print(f"[EMAIL ERROR] {e}")
