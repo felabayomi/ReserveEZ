@@ -24,9 +24,9 @@ stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 STRIPE_PUBLIC_KEY = os.getenv("STRIPE_PUBLIC_KEY", "")
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
 SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
-SENDER_EMAIL = os.getenv("SENDER_EMAIL", "noreply@tableguard.com")
-SENDER_NAME = os.getenv("SENDER_NAME", "TableGuard")
-ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@tableguard.com")
+SENDER_EMAIL = os.getenv("SENDER_EMAIL", "noreply@reserveez.com")
+SENDER_NAME = os.getenv("SENDER_NAME", "ReserveEZ")
+ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@reserveez.com")
 
 YOUR_DOMAIN = os.getenv('REPLIT_DEV_DOMAIN', os.getenv('REPLIT_DOMAINS', 'localhost:5000').split(',')[0])
 BASE_URL = f"https://{YOUR_DOMAIN}"
@@ -854,7 +854,7 @@ def calendar_export(res_uuid):
 
     ics = f"""BEGIN:VCALENDAR
 VERSION:2.0
-PRODID:-//TableGuard//Reservation//EN
+PRODID:-//ReserveEZ//Reservation//EN
 BEGIN:VEVENT
 DTSTART:{start_dt.strftime('%Y%m%dT%H%M%S')}
 DTEND:{end_dt.strftime('%Y%m%dT%H%M%S')}

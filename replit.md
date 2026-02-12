@@ -1,12 +1,13 @@
-# TableGuard - Restaurant Reservation System
+# ReserveEZ - Restaurant Reservation System
 
 ## Overview
 
-TableGuard is a multi-restaurant reservation platform with comprehensive no-show protection. It enables customers to browse restaurants, check real-time availability, and reserve tables with secure deposits or card holds. Restaurant owners have a full admin dashboard for managing tables, reservations, policies, and tracking no-show statistics.
+ReserveEZ (Reserve Table Easy) is a multi-restaurant reservation platform by Errand Easy company, with comprehensive no-show protection. It enables customers to browse restaurants, check real-time availability, and reserve tables with secure deposits or card holds. Restaurant owners have a full admin dashboard for managing tables, reservations, policies, and tracking no-show statistics.
 
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
+Branding: "ReserveEZ" (Reserve Table Easy), an Errand Easy company. All rights reserved.
 
 ## System Architecture
 
