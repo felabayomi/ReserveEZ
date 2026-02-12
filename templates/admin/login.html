@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Admin Login - TableGuard{% endblock %}
+{% block content %}
+<div class="row justify-content-center mt-5">
+  <div class="col-md-4">
+    <div class="card p-4">
+      <h3 class="text-center mb-4" style="color: var(--tg-accent);">Admin Login</h3>
+      <form method="POST" action="/admin/login">
+        <div class="mb-3">
+          <label for="password" class="form-label">Password</label>
+          <input type="password" class="form-control" id="password" name="password" required>
+        </div>
+        <button type="submit" class="btn btn-accent w-100">Login</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

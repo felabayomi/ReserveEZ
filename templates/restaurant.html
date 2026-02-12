@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+{% block title %}{{ restaurant.name }} - TableGuard{% endblock %}
+{% block head %}
+<style>
+  .date-scroll {
+    display: flex;
+    gap: 0.5rem;
+    overflow-x: auto;
+    padding-bottom: 0.5rem;
+    scrollbar-width: thin;
+    scrollbar-color: var(--tg-accent) transparent;
+  }
+  .date-scroll::-webkit-scrollbar { height: 4px; }
+  .date-scroll::-webkit-scrollbar-thumb { background: var(--tg-accent); border-radius: 4px; }
+  .date-btn {
+    min-width: 70px;
+    padding: 0.5rem;
+    border: 2px solid rgba(233, 69, 96, 0.2);
+    border-radius: 12px;
+    background: rgba(15, 52, 96, 0.3);
+    color: #e0e0e0;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-shrink: 0;
+    text-decoration: none;
+  }
+  .date-btn:hover:not(.disabled) {
+    border-color: var(--tg-accent);
+    background: rgba(233, 69, 96, 0.1);
+    color: #fff;
+  }
+  .date-btn.active {
+    background: var(--tg-accent);
+    border-color: var(--tg-accent);
+    color: #fff;
+  }
+  .date-btn.disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    text-decoration: line-through;
+  }
+  .date-btn .day-name { font-size: 0.7rem; text-transform: uppercase; opacity: 0.7; }
+  .date-btn .day-num { font-size: 1.2rem; font-weight: 700; line-height: 1.2; }
+  .date-btn .month { font-size: 0.65rem; text-transform: uppercase; opacity: 0.7; }
+  .slot-btn {
+    border-radius: 8px;
+    padding: 0.5rem 1rem;
+    font-weight: 600;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+    text-decoration: none;
+  }
+  .slot-available {
+    background: rgba(25, 135, 84, 0.15);
+    border: 1px solid rgba(25, 135, 84, 0.4);
+    color: #75b798;
+  }
+  .slot-available:hover {
+    background: #198754;
+    border-color: #198754;
+    color: #fff;
+  }
+  .slot-unavailable {
+    background: rgba(108, 117, 125, 0.1);
+    border: 1px solid rgba(108, 117, 125, 0.2);
+    color: #6c757d;
+    cursor: not-allowed;
+  }
+  .policy-card {
+    background: rgba(15, 52, 96, 0.4);
+    border: 1px solid rgba(233, 69, 96, 0.1);
+  }
+  .cuisine-badge {
+    background: rgba(233, 69, 96, 0.15);
+    color: var(--tg-accent);
+    border: 1px solid rgba(233, 69, 96, 0.3);
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+  <a href="/" class="text-decoration-none small opacity-75">&larr; All Restaurants</a>
+</div>
+
+<div class="row">
+  <div class="col-lg-8">
+    <div class="d-flex align-items-start justify-content-between mb-2 flex-wrap gap-2">
+      <h2 class="fw-bold text-white mb-0">{{ restaurant.name }}</h2>
+      <span class="badge cuisine-badge rounded-pill fs-6">{{ restaurant.cuisine_type }}</span>
+    </div>
+    <p class="text-light opacity-75 mb-3">{{ restaurant.description }}</p>
+    <div class="d-flex flex-wrap gap-3 mb-4 small text-light opacity-50">
+      <span>
+        <svg width="14" height="14" fill="currentColor" class="me-1" viewBox="0 0 16 16"><path d="M8 16s6-5.686 6-10A6 6 0 0 0 2 6c0 4.314 6 10 6 10zm0-7a3 3 0 1 1 0-6 3 3 0 0 1 0 6z"/></svg>
+        {{ restaurant.address }}
+      </span>
+      <span>
+        <svg width="14" height="14" fill="currentColor" class="me-1" viewBox="0 0 16 16"><path d="M3.654 1.328a.678.678 0 0 0-1.015-.063L1.605 2.3c-.483.484-.661 1.169-.45 1.77a17.568 17.568 0 0 0 4.168 6.608 17.569 17.569 0 0 0 6.608 4.168c.601.211 1.286.033 1.77-.45l1.034-1.034a.678.678 0 0 0-.063-1.015l-2.307-1.794a.678.678 0 0 0-.58-.122l-2.19.547a1.745 1.745 0 0 1-1.657-.459L5.482 8.062a1.745 1.745 0 0 1-.46-1.657l.548-2.19a.678.678 0 0 0-.122-.58L3.654 1.328z"/></svg>
+        {{ restaurant.phone }}
+      </span>
+    </div>
+
+    <h5 class="fw-semibold mb-3">Select Date</h5>
+    <div class="date-scroll mb-4">
+      {% for d in dates %}
+        <a href="/restaurant/{{ restaurant.slug }}?date={{ d.date.isoformat() }}&party_size={{ party_size }}"
+           class="date-btn {% if d.date == selected_date %}active{% endif %}{% if not d.open %} disabled{% endif %}"
+           {% if not d.open %}onclick="return false;"{% endif %}>
+          <div class="day-name">{{ d.day_name }}</div>
+          <div class="day-num">{{ d.day_num }}</div>
+          <div class="month">{{ d.month }}</div>
+        </a>
+      {% endfor %}
+    </div>
+
+    <h5 class="fw-semibold mb-3">Party Size</h5>
+    <div class="mb-4">
+      <select id="partySizeSelect" class="form-select w-auto" style="background-color: rgba(15,52,96,0.5); border-color: rgba(233,69,96,0.2); color: #e0e0e0;">
+        {% for i in range(1, restaurant.max_party_size + 1) %}
+          <option value="{{ i }}" {% if i == party_size %}selected{% endif %}>{{ i }} {{ 'Guest' if i == 1 else 'Guests' }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <h5 class="fw-semibold mb-3">Available Times</h5>
+    {% if available_slots %}
+      <div class="d-flex flex-wrap gap-2 mb-4">
+        {% for slot in available_slots %}
+          {% if slot.available %}
+            <a href="/reserve/{{ restaurant.slug }}?date={{ selected_date.isoformat() }}&time={{ slot.time }}&party_size={{ party_size }}"
+               class="slot-btn slot-available">{{ slot.time_display }}</a>
+          {% else %}
+            <span class="slot-btn slot-unavailable">{{ slot.time_display }}</span>
+          {% endif %}
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="card p-4 text-center mb-4">
+        <p class="mb-2 text-light opacity-75">No availability for this date.</p>
+        <button class="btn btn-outline-light btn-sm mx-auto" onclick="document.getElementById('waitlistSection').style.display='block'; this.style.display='none';">
+          Join Waitlist
+        </button>
+      </div>
+    {% endif %}
+
+    <div id="waitlistSection" style="display:none;" class="card p-4 mb-4">
+      <h5 class="fw-semibold mb-3">Join Waitlist</h5>
+      <form method="POST" action="/waitlist/{{ restaurant.slug }}">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label small">Name</label>
+            <input type="text" name="guest_name" class="form-control" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small">Email</label>
+            <input type="email" name="guest_email" class="form-control" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small">Phone</label>
+            <input type="tel" name="guest_phone" class="form-control" required>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label small">Party Size</label>
+            <input type="number" name="party_size" class="form-control" value="{{ party_size }}" min="1" max="{{ restaurant.max_party_size }}">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label small">Date</label>
+            <input type="date" name="desired_date" class="form-control" value="{{ selected_date.isoformat() }}">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small">Preferred Time (optional)</label>
+            <input type="time" name="desired_time" class="form-control">
+          </div>
+          <div class="col-12">
+            <button type="submit" class="btn btn-accent">Submit Waitlist Request</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card policy-card p-4">
+      <h6 class="fw-semibold mb-3" style="color: var(--tg-accent);">Reservation Policy</h6>
+      <ul class="list-unstyled mb-0 small">
+        <li class="mb-2 d-flex justify-content-between">
+          <span class="opacity-75">Deposit</span>
+          <span class="text-white fw-semibold">{{ as_money(restaurant.deposit_amount_cents) }}{% if restaurant.deposit_type == 'per_person' %}/person{% else %} flat{% endif %}</span>
+        </li>
+        <li class="mb-2 d-flex justify-content-between">
+          <span class="opacity-75">Free cancellation</span>
+          <span class="text-white fw-semibold">{{ restaurant.cancellation_cutoff_hours }}h before</span>
+        </li>
+        <li class="mb-2 d-flex justify-content-between">
+          <span class="opacity-75">No-show fee</span>
+          <span class="text-white fw-semibold">{{ as_money(restaurant.no_show_fee_cents) }}</span>
+        </li>
+        <li class="d-flex justify-content-between">
+          <span class="opacity-75">Late cancel fee</span>
+          <span class="text-white fw-semibold">{{ as_money(restaurant.late_cancel_fee_cents) }}</span>
+        </li>
+      </ul>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('partySizeSelect').addEventListener('change', function() {
+  const ps = this.value;
+  const url = '/restaurant/{{ restaurant.slug }}?date={{ selected_date.isoformat() }}&party_size=' + ps;
+  window.location.href = url;
+});
+</script>
+{% endblock %}

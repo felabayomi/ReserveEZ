@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Waitlist - TableGuard{% endblock %}
+{% block content %}
+<h2 class="mb-4" style="color: var(--tg-accent);">Waitlist</h2>
+
+<div class="card p-3">
+  <div class="table-responsive">
+    <table class="table table-dark table-hover">
+      <thead>
+        <tr>
+          <th>Guest</th>
+          <th>Email</th>
+          <th>Phone</th>
+          <th>Restaurant</th>
+          <th>Date</th>
+          <th>Time</th>
+          <th>Party Size</th>
+          <th>Status</th>
+          <th>Added</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for w in waitlist_entries %}
+        <tr>
+          <td>{{ w.guest_name }}</td>
+          <td>{{ w.guest_email }}</td>
+          <td>{{ w.guest_phone }}</td>
+          <td>{{ w.restaurant.name }}</td>
+          <td>{{ w.desired_date.strftime('%m/%d/%Y') }}</td>
+          <td>{{ w.desired_time.strftime('%H:%M') if w.desired_time else '-' }}</td>
+          <td>{{ w.party_size }}</td>
+          <td>
+            {% if w.status == 'waiting' %}
+              <span class="badge bg-warning text-dark">Waiting</span>
+            {% elif w.status == 'notified' %}
+              <span class="badge bg-primary">Notified</span>
+            {% elif w.status == 'expired' %}
+              <span class="badge bg-secondary">Expired</span>
+            {% else %}
+              <span class="badge bg-light text-dark">{{ w.status }}</span>
+            {% endif %}
+          </td>
+          <td>{{ w.created_at.strftime('%m/%d/%Y %H:%M') }}</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="9" class="text-center text-muted">No waitlist entries</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

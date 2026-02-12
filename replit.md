@@ -1,75 +1,93 @@
-# EasyDesk Booking System
+# TableGuard - Restaurant Reservation System
 
 ## Overview
 
-EasyDesk is a flexible desk booking and coworking space management system designed for City Discoverer at 50 Stately St, Suite 2, Wiley Ford WV 26767. The system enables customers to book workspace by the hour or purchase day/week/month passes for unlimited bookings during valid periods. It supports both online payments through Mercury and onsite payments via Chase POS terminal.
-
-The application handles resource management with configurable capacity limits and opening hours, implements a promotional code system (EASYWEEK for 100% off first booking), and provides administrative tools for managing bookings, resources, and payments.
+TableGuard is a multi-restaurant reservation platform with comprehensive no-show protection. It enables customers to browse restaurants, check real-time availability, and reserve tables with secure deposits or card holds. Restaurant owners have a full admin dashboard for managing tables, reservations, policies, and tracking no-show statistics.
 
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
-Simplified calendar interface: Only today shown in olive green, all other dates normal/white until actually booked.
 
 ## System Architecture
 
 ### Backend Framework
-- **Flask** web application with SQLAlchemy ORM for database operations
-- **SQLite** database for local development with migration-ready structure
-- **Environment-based configuration** using python-dotenv for secrets management
+- **Flask** web application with SQLAlchemy ORM
+- **PostgreSQL** database (Neon-backed via Replit)
+- **Environment-based configuration** using python-dotenv
 
-### Database Design
-- **Resource model**: Stores workspace details including name, hourly rates, capacity, and JSON-encoded opening hours
-- **Booking model**: Tracks individual reservations with timestamps, customer details, and payment status
-- **Pass model**: Manages day/week/month passes with validity periods and activation status
-- **Payment model**: Provider-agnostic payment tracking supporting Mercury and Chase POS
+### Database Models
+- **Restaurant**: Name, slug, cuisine type, address, opening hours (JSON), deposit/cancellation policies, no-show fees
+- **Table**: Per-restaurant tables with capacity, type (standard/window/booth/counter/patio/private)
+- **Reservation**: Full lifecycle tracking (confirmed/seated/cancelled/no_show/completed), deposit tracking, Stripe payment references
+- **WaitlistEntry**: Waitlist with auto-notification when slots open, 2-hour expiration
+- **NoShowRecord**: Per-guest no-show history for repeat offender tracking
+- **PromoCode**: Flexible codes (percent/flat/free), per-restaurant or global, deposit waiver option
+- **NotificationLog**: Email delivery tracking
+
+### No-Show Protection System
+- **Credit card holds**: Stripe SetupIntent saves card for later charging
+- **Prepaid deposits**: Per-person or flat rate deposits charged via Stripe PaymentIntent
+- **Confirmation reminders**: 24-hour and 2-hour email reminders with "Confirm Attendance" button
+- **No-show tracking**: Per-guest history; repeat offenders (2+) require higher deposits
+- **Cancellation policy**: Configurable cutoff hours; free cancellation before cutoff, late cancel fee after
+- **No-show fees**: Automatic charging to saved card when marked as no-show
+- **Waitlist system**: Auto-notify waitlisted guests when cancellations/no-shows open slots
 
 ### Payment Architecture
-- **Dual payment system**: Mercury API for online payments and Chase POS for onsite transactions
-- **Provider abstraction**: Payment layer designed to be swappable between different payment processors
-- **Payment states**: Created, pending, paid, failed, refunded status tracking
-- **Webhook support**: Mercury webhook endpoint for automated payment confirmation
+- **Stripe integration**: PaymentIntents for deposits, SetupIntents for card holds
+- **No-show charging**: Creates new PaymentIntent against saved PaymentMethod
+- **Automatic refunds**: Full deposit refund for timely cancellations
+- **Promo code discounts**: Can reduce or waive deposits
 
-### Business Logic
-- **Capacity management**: Real-time seat availability checking with configurable limits per resource with visual desk icons
-- **Opening hours validation**: JSON-stored weekly schedules with day-specific time slots
-- **Pass system**: Three tiers (day/week/month) with automatic free booking privileges during validity
-- **Promotional codes**: First-booking discount system with email-based eligibility tracking
-- **Visual desk representation**: Interactive desk icons showing available/selected/booked status with real-time updates
+### Email System (SendGrid)
+- **Booking confirmation**: Details, manage link, calendar export link
+- **24-hour reminder**: Confirm attendance button, cancellation link
+- **2-hour reminder**: Final reminder with no-show policy warning
+- **Cancellation confirmation**: Fee notification if late cancel
+- **No-show notification**: Fee charged notice, repeat offender warning
+- **Waitlist notification**: Available slot alert with 2-hour claim window
 
 ### Authentication & Authorization
-- **Simple admin access**: Password-based admin panel for resource and booking management
-- **No user accounts**: Guest booking system with email-based identification
-- **Session management**: Flask sessions for admin authentication
+- **Simple admin access**: Password-based admin panel (ADMIN_PASSWORD env var)
+- **No user accounts**: Guest booking with name + email + phone
+- **Secure self-service**: Signed tokens (itsdangerous) for manage/cancel links
 
-### Feature Flags
-- **USE_MERCURY**: Toggle between Mercury API and mock payment flows
-- **ALLOW_POS_CHECKOUT**: Enable/disable Chase POS onsite payment option
-- **Environment-driven**: Production vs development behavior controlled via environment variables
+### Admin Dashboard
+- **Overview**: Today's reservations, upcoming count, no-show stats, waitlist count
+- **Restaurant management**: Add/edit restaurants, configure policies and opening hours
+- **Table management**: Add/edit/delete tables per restaurant
+- **Reservation management**: Filter by date/status, mark seated/no-show/completed
+- **No-show statistics**: Repeat offenders, per-restaurant stats, fee collection totals
+- **Promo codes**: Create/manage codes, toggle active, track usage
+- **Waitlist**: View and manage waitlisted guests
+
+### Cron Endpoints
+- `/cron/send-reminders` - Sends 24h and 2h email reminders
+- `/cron/process-no-shows` - Auto-marks past reservations as no-show, charges fees
+- `/cron/expire-waitlist` - Expires unclaimed waitlist notifications and past entries
 
 ## External Dependencies
 
 ### Payment Services
-- **Mercury API**: Online payment processing with invoice generation and webhook notifications
-- **Chase POS**: Manual payment processing for onsite transactions with admin reconciliation
+- **Stripe**: Deposits, card holds, no-show fee charging, refunds
 
-### Infrastructure Services
-- **QR Code generation**: Python qrcode library for check-in QR codes
-- **Email notifications**: SMTP support for booking confirmations and receipts (optional)
-- **Calendar integration**: ICS file generation for booking calendar imports
+### Email Services
+- **SendGrid**: All transactional emails (confirmations, reminders, notifications)
 
-### Development Tools
-- **Bootstrap 5.3.3**: Frontend UI framework via CDN
-- **Python libraries**: Flask, SQLAlchemy, python-dotenv, qrcode, Pillow, requests, cairosvg
-- **Environment management**: .env file configuration for secrets and feature flags
-- **PWA support**: Web app manifest and mobile home screen icons (olive green desk theme)
+### Frontend
+- **Bootstrap 5.3.3**: UI framework via CDN
+- **Stripe.js**: Client-side card element for secure payment
 
-### Email Notifications  
-- **SendGrid integration**: Automated booking confirmation emails sent on successful checkout
-- **Dual recipients**: Emails sent to both customer and admin (hello@citydiscoverer.ai)
-- **Professional branding**: Emails from billing@citydiscoverer.ai with hello@citydiscoverer.ai reply-to
-- **Comprehensive details**: HTML emails include booking details, workspace info, timing, and location
+### Python Libraries
+- Flask, Flask-SQLAlchemy, psycopg2-binary, stripe, sendgrid, python-dotenv
+- itsdangerous (secure token generation), pytz, gunicorn, qrcode, Pillow
 
-### Optional Integrations
-- **Calendar exports**: .ics file downloads for individual bookings  
-- **Webhook endpoints**: Mercury payment confirmation and status updates
+## Environment Variables
+- `DATABASE_URL` - PostgreSQL connection string
+- `STRIPE_SECRET_KEY` - Stripe secret key
+- `STRIPE_PUBLIC_KEY` - Stripe publishable key
+- `STRIPE_WEBHOOK_SECRET` - Stripe webhook signing secret
+- `SENDGRID_API_KEY` - SendGrid API key
+- `SENDER_EMAIL` - From email address
+- `ADMIN_PASSWORD` - Admin panel password (default: "admin")
+- `FLASK_SECRET` - Flask session secret key

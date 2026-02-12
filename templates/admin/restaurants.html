@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Manage Restaurants - TableGuard{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 style="color: var(--tg-accent);">Restaurants</h2>
+  <a href="/admin/restaurant/new" class="btn btn-accent">Add Restaurant</a>
+</div>
+
+<div class="card p-3">
+  <div class="table-responsive">
+    <table class="table table-dark table-hover">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Cuisine</th>
+          <th>Deposit</th>
+          <th>No-Show Fee</th>
+          <th>Active</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in restaurants %}
+        <tr>
+          <td>{{ r.name }}</td>
+          <td>{{ r.cuisine_type }}</td>
+          <td>${{ '%.2f'|format(r.deposit_amount_cents / 100) }}</td>
+          <td>${{ '%.2f'|format(r.no_show_fee_cents / 100) }}</td>
+          <td>
+            {% if r.active %}
+              <span class="badge bg-success">Active</span>
+            {% else %}
+              <span class="badge bg-secondary">Inactive</span>
+            {% endif %}
+          </td>
+          <td>
+            <a href="/admin/restaurant/{{ r.id }}/edit" class="btn btn-sm btn-outline-light">Edit</a>
+            <a href="/admin/restaurant/{{ r.id }}/tables" class="btn btn-sm btn-outline-light">Tables</a>
+            <a href="/admin/restaurant/{{ r.id }}/reservations" class="btn btn-sm btn-outline-light">Reservations</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

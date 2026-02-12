@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}Tables - {{ restaurant.name }} - TableGuard{% endblock %}
+{% block content %}
+<h2 class="mb-4" style="color: var(--tg-accent);">Tables - {{ restaurant.name }}</h2>
+
+<div class="card p-3 mb-4">
+  <div class="table-responsive">
+    <table class="table table-dark table-hover">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Capacity</th>
+          <th>Type</th>
+          <th>Active</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in restaurant.tables %}
+        <tr>
+          <td>{{ t.name }}</td>
+          <td>{{ t.capacity }}</td>
+          <td>{{ t.table_type|capitalize }}</td>
+          <td>
+            {% if t.active %}
+              <span class="badge bg-success">Active</span>
+            {% else %}
+              <span class="badge bg-secondary">Inactive</span>
+            {% endif %}
+          </td>
+          <td>
+            <button class="btn btn-sm btn-outline-light" data-bs-toggle="modal" data-bs-target="#editModal{{ t.id }}">Edit</button>
+            <form method="POST" action="/admin/table/{{ t.id }}/delete" class="d-inline" onsubmit="return confirm('Delete this table?')">
+              <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+            </form>
+          </td>
+        </tr>
+        <div class="modal fade" id="editModal{{ t.id }}" tabindex="-1">
+          <div class="modal-dialog">
+            <div class="modal-content" style="background-color: var(--tg-dark); border: 1px solid var(--tg-accent);">
+              <form method="POST" action="/admin/table/{{ t.id }}/edit">
+                <div class="modal-header border-secondary">
+                  <h5 class="modal-title">Edit {{ t.name }}</h5>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                  <div class="mb-3">
+                    <label class="form-label">Name</label>
+                    <input type="text" class="form-control" name="name" value="{{ t.name }}" required>
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label">Capacity</label>
+                    <input type="number" class="form-control" name="capacity" value="{{ t.capacity }}" required>
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label">Type</label>
+                    <select class="form-select" name="table_type">
+                      {% for tt in ['standard', 'window', 'booth', 'counter', 'patio', 'private'] %}
+                      <option value="{{ tt }}" {{ 'selected' if t.table_type == tt }}>{{ tt|capitalize }}</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="active" id="active{{ t.id }}" {{ 'checked' if t.active }}>
+                    <label class="form-check-label" for="active{{ t.id }}">Active</label>
+                  </div>
+                </div>
+                <div class="modal-footer border-secondary">
+                  <button type="button" class="btn btn-outline-light" data-bs-dismiss="modal">Cancel</button>
+                  <button type="submit" class="btn btn-accent">Save</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card p-4">
+  <h5 class="mb-3">Add Table</h5>
+  <form method="POST" action="/admin/restaurant/{{ restaurant.id }}/table/add">
+    <div class="row g-3">
+      <div class="col-md-4">
+        <label class="form-label">Name</label>
+        <input type="text" class="form-control" name="name" required>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Capacity</label>
+        <input type="number" class="form-control" name="capacity" value="4" required>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Type</label>
+        <select class="form-select" name="table_type">
+          <option value="standard">Standard</option>
+          <option value="window">Window</option>
+          <option value="booth">Booth</option>
+          <option value="counter">Counter</option>
+          <option value="patio">Patio</option>
+          <option value="private">Private</option>
+        </select>
+      </div>
+      <div class="col-md-2 d-flex align-items-end">
+        <button type="submit" class="btn btn-accent w-100">Add</button>
+      </div>
+    </div>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,216 @@
+{% extends "base.html" %}
+{% block title %}Reserve - {{ restaurant.name }} - TableGuard{% endblock %}
+{% block head %}
+<style>
+  .summary-card {
+    background: linear-gradient(135deg, rgba(15, 52, 96, 0.6) 0%, rgba(26, 26, 46, 0.8) 100%);
+    border: 1px solid rgba(233, 69, 96, 0.2);
+    border-radius: 16px;
+  }
+  .summary-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.4rem 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+  .summary-item:last-child { border-bottom: none; }
+  .promo-feedback { font-size: 0.85rem; margin-top: 0.25rem; }
+  #card-element {
+    background: rgba(15, 52, 96, 0.4);
+    border: 1px solid rgba(233, 69, 96, 0.2);
+    border-radius: 8px;
+    padding: 12px;
+  }
+  #card-errors { color: #e94560; font-size: 0.85rem; margin-top: 0.5rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+  <a href="/restaurant/{{ restaurant.slug }}?date={{ res_date.isoformat() }}&party_size={{ party_size }}" class="text-decoration-none small opacity-75">&larr; Back to {{ restaurant.name }}</a>
+</div>
+
+<div class="row g-4">
+  <div class="col-lg-5">
+    <div class="summary-card p-4 mb-4">
+      <h5 class="fw-bold text-white mb-3">Reservation Summary</h5>
+      <div class="summary-item">
+        <span class="opacity-75">Restaurant</span>
+        <span class="text-white fw-semibold">{{ restaurant.name }}</span>
+      </div>
+      <div class="summary-item">
+        <span class="opacity-75">Date</span>
+        <span class="text-white fw-semibold">{{ res_date.strftime('%A, %B %d, %Y') }}</span>
+      </div>
+      <div class="summary-item">
+        <span class="opacity-75">Time</span>
+        <span class="text-white fw-semibold">{{ res_time.strftime('%-I:%M %p') }}</span>
+      </div>
+      <div class="summary-item">
+        <span class="opacity-75">End Time</span>
+        <span class="text-white fw-semibold">{{ end_time.strftime('%-I:%M %p') }}</span>
+      </div>
+      <div class="summary-item">
+        <span class="opacity-75">Party Size</span>
+        <span class="text-white fw-semibold">{{ party_size }} {{ 'Guest' if party_size == 1 else 'Guests' }}</span>
+      </div>
+      <div class="summary-item">
+        <span class="opacity-75">Deposit</span>
+        <span class="fw-bold" style="color: var(--tg-accent);">{{ as_money(deposit_amount) }}</span>
+      </div>
+    </div>
+
+    {% if force_deposit %}
+      <div class="alert alert-warning border-0" style="background: rgba(255,193,7,0.15); color: #ffc107;">
+        <svg width="16" height="16" fill="currentColor" class="me-2" viewBox="0 0 16 16"><path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/></svg>
+        <strong>Notice:</strong> Due to previous no-show history, a higher deposit is required.
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="col-lg-7">
+    <div class="card p-4">
+      <h5 class="fw-bold text-white mb-3">Your Details</h5>
+      <form id="reserveForm" method="POST" action="/reserve/{{ restaurant.slug }}">
+        <input type="hidden" name="date" value="{{ res_date.isoformat() }}">
+        <input type="hidden" name="time" value="{{ res_time.strftime('%H:%M') }}">
+        <input type="hidden" name="party_size" value="{{ party_size }}">
+
+        <div class="mb-3">
+          <label class="form-label small">Full Name <span class="text-danger">*</span></label>
+          <input type="text" name="guest_name" class="form-control" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small">Email <span class="text-danger">*</span></label>
+          <input type="email" name="guest_email" class="form-control" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small">Phone <span class="text-danger">*</span></label>
+          <input type="tel" name="guest_phone" class="form-control" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small">Special Requests</label>
+          <textarea name="special_requests" class="form-control" rows="3" placeholder="Allergies, celebrations, seating preferences..."></textarea>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small">Promo Code</label>
+          <div class="input-group">
+            <input type="text" name="promo_code" id="promoInput" class="form-control" placeholder="Enter code">
+            <button type="button" class="btn btn-outline-light" id="validatePromoBtn">Apply</button>
+          </div>
+          <div id="promoFeedback" class="promo-feedback"></div>
+        </div>
+
+        {% if (restaurant.require_card_hold or restaurant.require_deposit) and stripe_public_key %}
+          <div class="mb-3">
+            <label class="form-label small">Card Details <span class="text-danger">*</span></label>
+            <div id="card-element"></div>
+            <div id="card-errors"></div>
+          </div>
+        {% endif %}
+
+        <button type="submit" class="btn btn-accent btn-lg w-100" id="submitBtn">Confirm Reservation</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if (restaurant.require_card_hold or restaurant.require_deposit) and stripe_public_key %}
+<script src="https://js.stripe.com/v3/"></script>
+<script>
+  const stripe = Stripe('{{ stripe_public_key }}');
+  const elements = stripe.elements();
+  const cardElement = elements.create('card', {
+    style: {
+      base: {
+        color: '#e0e0e0',
+        fontFamily: 'Segoe UI, system-ui, sans-serif',
+        fontSize: '16px',
+        '::placeholder': { color: '#6c757d' }
+      },
+      invalid: { color: '#e94560' }
+    }
+  });
+  cardElement.mount('#card-element');
+
+  cardElement.on('change', function(event) {
+    const el = document.getElementById('card-errors');
+    el.textContent = event.error ? event.error.message : '';
+  });
+
+  const form = document.getElementById('reserveForm');
+  form.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const submitBtn = document.getElementById('submitBtn');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Processing...';
+
+    try {
+      const resp = await fetch('/create-setup-intent', { method: 'POST', headers: {'Content-Type': 'application/json'} });
+      const data = await resp.json();
+
+      if (data.error) {
+        document.getElementById('card-errors').textContent = data.error;
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Confirm Reservation';
+        return;
+      }
+
+      const { setupIntent, error } = await stripe.confirmCardSetup(data.clientSecret, {
+        payment_method: { card: cardElement }
+      });
+
+      if (error) {
+        document.getElementById('card-errors').textContent = error.message;
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Confirm Reservation';
+        return;
+      }
+
+      const pmInput = document.createElement('input');
+      pmInput.type = 'hidden';
+      pmInput.name = 'payment_method_id';
+      pmInput.value = setupIntent.payment_method;
+      form.appendChild(pmInput);
+
+      const siInput = document.createElement('input');
+      siInput.type = 'hidden';
+      siInput.name = 'setup_intent_id';
+      siInput.value = setupIntent.id;
+      form.appendChild(siInput);
+
+      form.submit();
+    } catch (err) {
+      document.getElementById('card-errors').textContent = 'An error occurred. Please try again.';
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Confirm Reservation';
+    }
+  });
+</script>
+{% endif %}
+<script>
+  document.getElementById('validatePromoBtn').addEventListener('click', async function() {
+    const code = document.getElementById('promoInput').value.trim();
+    const feedback = document.getElementById('promoFeedback');
+    if (!code) { feedback.innerHTML = ''; return; }
+
+    try {
+      const resp = await fetch('/api/validate-promo', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ code: code, restaurant_id: {{ restaurant.id }}, party_size: {{ party_size }} })
+      });
+      const data = await resp.json();
+      if (data.valid) {
+        feedback.innerHTML = '<span class="text-success">' + data.message + '</span>';
+      } else {
+        feedback.innerHTML = '<span class="text-danger">' + data.message + '</span>';
+      }
+    } catch (err) {
+      feedback.innerHTML = '<span class="text-danger">Error validating code.</span>';
+    }
+  });
+</script>
+{% endblock %}

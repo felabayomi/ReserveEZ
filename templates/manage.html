@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}Manage Reservation - TableGuard{% endblock %}
+{% block head %}
+<style>
+  .status-confirmed { background: rgba(25,135,84,0.15); color: #75b798; border: 1px solid rgba(25,135,84,0.3); }
+  .status-cancelled { background: rgba(220,53,69,0.15); color: #ea868f; border: 1px solid rgba(220,53,69,0.3); }
+  .status-no_show { background: rgba(220,53,69,0.15); color: #ea868f; border: 1px solid rgba(220,53,69,0.3); }
+  .status-seated { background: rgba(13,110,253,0.15); color: #6ea8fe; border: 1px solid rgba(13,110,253,0.3); }
+  .status-completed { background: rgba(108,117,125,0.15); color: #adb5bd; border: 1px solid rgba(108,117,125,0.3); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-7">
+    <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+      <h3 class="fw-bold text-white mb-0">Manage Reservation</h3>
+      <span class="badge rounded-pill px-3 py-2 status-{{ r.status }}">{{ r.status|replace('_', ' ')|title }}</span>
+    </div>
+
+    {% if r.guest_confirmed %}
+      <div class="alert border-0 mb-3" style="background: rgba(25,135,84,0.1); color: #75b798; border: 1px solid rgba(25,135,84,0.2) !important;">
+        <svg width="16" height="16" fill="currentColor" class="me-2" viewBox="0 0 16 16"><path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/></svg>
+        Attendance Confirmed
+      </div>
+    {% endif %}
+
+    <div class="card p-4 mb-4">
+      <div class="row g-3">
+        <div class="col-sm-6">
+          <div class="small opacity-50">Restaurant</div>
+          <div class="text-white fw-semibold">{{ r.restaurant.name }}</div>
+        </div>
+        <div class="col-sm-6">
+          <div class="small opacity-50">Confirmation Code</div>
+          <div class="fw-bold" style="color: var(--tg-accent); font-family: monospace; font-size: 1.1rem;">{{ r.uuid[:8]|upper }}</div>
+        </div>
+        <div class="col-sm-6">
+          <div class="small opacity-50">Date</div>
+          <div class="text-white fw-semibold">{{ r.reservation_date.strftime('%A, %B %d, %Y') }}</div>
+        </div>
+        <div class="col-sm-6">
+          <div class="small opacity-50">Time</div>
+          <div class="text-white fw-semibold">{{ r.reservation_time.strftime('%-I:%M %p') }}</div>
+        </div>
+        <div class="col-sm-6">
+          <div class="small opacity-50">Party Size</div>
+          <div class="text-white fw-semibold">{{ r.party_size }} {{ 'Guest' if r.party_size == 1 else 'Guests' }}</div>
+        </div>
+        <div class="col-sm-6">
+          <div class="small opacity-50">Table</div>
+          <div class="text-white fw-semibold">{{ r.table.name if r.table else 'Assigned at arrival' }}</div>
+        </div>
+        {% if r.deposit_paid and r.deposit_amount_cents > 0 %}
+          <div class="col-sm-6">
+            <div class="small opacity-50">Deposit Paid</div>
+            <div class="fw-semibold" style="color: #198754;">{{ as_money(r.deposit_amount_cents) }}</div>
+          </div>
+        {% endif %}
+        {% if r.special_requests %}
+          <div class="col-12">
+            <div class="small opacity-50">Special Requests</div>
+            <div class="text-white">{{ r.special_requests }}</div>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if r.status == 'confirmed' and r.is_upcoming %}
+      <div class="card p-4 mb-4">
+        {% if r.can_cancel_free %}
+          <p class="small mb-3" style="color: #75b798;">
+            <svg width="14" height="14" fill="currentColor" class="me-1" viewBox="0 0 16 16"><path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/></svg>
+            Free cancellation available
+          </p>
+        {% else %}
+          <div class="alert border-0 mb-3" style="background: rgba(255,193,7,0.1); color: #ffc107; border: 1px solid rgba(255,193,7,0.2) !important;">
+            <svg width="14" height="14" fill="currentColor" class="me-1" viewBox="0 0 16 16"><path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/></svg>
+            Late cancellation - a fee of {{ as_money(r.restaurant.late_cancel_fee_cents) }} will be charged.
+          </div>
+        {% endif %}
+        <form method="POST" action="/cancel/{{ r.uuid }}/{{ token }}" onsubmit="return confirm('Are you sure you want to cancel this reservation?');">
+          <button type="submit" class="btn btn-outline-danger w-100">Cancel Reservation</button>
+        </form>
+      </div>
+    {% endif %}
+
+    {% if r.status == 'cancelled' %}
+      <div class="alert border-0 mb-4" style="background: rgba(220,53,69,0.1); color: #ea868f; border: 1px solid rgba(220,53,69,0.2) !important;">
+        This reservation was cancelled{% if r.cancelled_at %} on {{ r.cancelled_at.strftime('%B %d, %Y at %-I:%M %p') }}{% endif %}.
+        {% if r.no_show_fee_charged %}
+          <br>A late cancellation fee of {{ as_money(r.no_show_fee_amount_cents) }} was charged.
+        {% endif %}
+      </div>
+    {% endif %}
+
+    {% if r.status == 'no_show' %}
+      <div class="alert border-0 mb-4" style="background: rgba(220,53,69,0.1); color: #ea868f; border: 1px solid rgba(220,53,69,0.2) !important;">
+        This reservation was marked as a no-show.
+        {% if r.no_show_fee_charged %}
+          A fee of {{ as_money(r.no_show_fee_amount_cents) }} was charged.
+        {% endif %}
+      </div>
+    {% endif %}
+
+    <div class="d-flex flex-wrap gap-3 justify-content-center">
+      {% if r.status in ['confirmed', 'seated'] %}
+        <a href="/calendar/{{ r.uuid }}.ics" class="btn btn-outline-light">
+          <svg width="16" height="16" fill="currentColor" class="me-2" viewBox="0 0 16 16"><path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5zM1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4H1z"/></svg>
+          Add to Calendar
+        </a>
+      {% endif %}
+      <a href="/" class="btn btn-outline-light">Back to Home</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

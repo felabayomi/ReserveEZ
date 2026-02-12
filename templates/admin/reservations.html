@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}Reservations - {{ restaurant.name }} - TableGuard{% endblock %}
+{% block content %}
+<h2 class="mb-4" style="color: var(--tg-accent);">Reservations - {{ restaurant.name }}</h2>
+
+<div class="card p-3 mb-4">
+  <form method="GET" class="row g-3 align-items-end">
+    <div class="col-md-4">
+      <label class="form-label">Date</label>
+      <input type="date" class="form-control" name="date" value="{{ request.args.get('date', '') }}" onchange="this.form.submit()">
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Status</label>
+      <select class="form-select" name="status" onchange="this.form.submit()">
+        <option value="all" {{ 'selected' if request.args.get('status', 'all') == 'all' }}>All</option>
+        <option value="confirmed" {{ 'selected' if request.args.get('status') == 'confirmed' }}>Confirmed</option>
+        <option value="seated" {{ 'selected' if request.args.get('status') == 'seated' }}>Seated</option>
+        <option value="cancelled" {{ 'selected' if request.args.get('status') == 'cancelled' }}>Cancelled</option>
+        <option value="no_show" {{ 'selected' if request.args.get('status') == 'no_show' }}>No-Show</option>
+        <option value="completed" {{ 'selected' if request.args.get('status') == 'completed' }}>Completed</option>
+      </select>
+    </div>
+    <div class="col-md-4">
+      <button type="submit" class="btn btn-accent">Filter</button>
+    </div>
+  </form>
+</div>
+
+<div class="card p-3">
+  <div class="table-responsive">
+    <table class="table table-dark table-hover">
+      <thead>
+        <tr>
+          <th>Time</th>
+          <th>Guest</th>
+          <th>Party</th>
+          <th>Phone</th>
+          <th>Table</th>
+          <th>Status</th>
+          <th>Deposit</th>
+          <th>Special Requests</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in reservations %}
+        <tr>
+          <td>{{ r.reservation_date.strftime('%m/%d') }} {{ r.reservation_time.strftime('%H:%M') }}</td>
+          <td>{{ r.guest_name }}</td>
+          <td>{{ r.party_size }}</td>
+          <td>{{ r.guest_phone }}</td>
+          <td>{{ r.table.name if r.table else '-' }}</td>
+          <td>
+            {% if r.status == 'confirmed' %}
+              <span class="badge bg-success">Confirmed</span>
+            {% elif r.status == 'seated' %}
+              <span class="badge bg-primary">Seated</span>
+            {% elif r.status == 'no_show' %}
+              <span class="badge bg-danger">No-Show</span>
+            {% elif r.status == 'cancelled' %}
+              <span class="badge bg-secondary">Cancelled</span>
+            {% elif r.status == 'completed' %}
+              <span class="badge bg-info">Completed</span>
+            {% else %}
+              <span class="badge bg-light text-dark">{{ r.status }}</span>
+            {% endif %}
+          </td>
+          <td>{{ as_money(r.deposit_amount_cents) }}</td>
+          <td>{{ r.special_requests or '-' }}</td>
+          <td>
+            <div class="dropdown">
+              <button class="btn btn-sm btn-outline-light dropdown-toggle" type="button" data-bs-toggle="dropdown">Actions</button>
+              <ul class="dropdown-menu dropdown-menu-dark">
+                <li>
+                  <form method="POST" action="/admin/reservation/{{ r.id }}/status">
+                    <input type="hidden" name="status" value="confirmed">
+                    <button type="submit" class="dropdown-item">Mark Confirmed</button>
+                  </form>
+                </li>
+                <li>
+                  <form method="POST" action="/admin/reservation/{{ r.id }}/status">
+                    <input type="hidden" name="status" value="seated">
+                    <button type="submit" class="dropdown-item">Mark Seated</button>
+                  </form>
+                </li>
+                <li>
+                  <form method="POST" action="/admin/reservation/{{ r.id }}/status">
+                    <input type="hidden" name="status" value="no_show">
+                    <button type="submit" class="dropdown-item">Mark No-Show</button>
+                  </form>
+                </li>
+                <li>
+                  <form method="POST" action="/admin/reservation/{{ r.id }}/status">
+                    <input type="hidden" name="status" value="completed">
+                    <button type="submit" class="dropdown-item">Mark Completed</button>
+                  </form>
+                </li>
+                <li>
+                  <form method="POST" action="/admin/reservation/{{ r.id }}/status">
+                    <input type="hidden" name="status" value="cancelled">
+                    <button type="submit" class="dropdown-item">Mark Cancelled</button>
+                  </form>
+                </li>
+              </ul>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="9" class="text-center text-muted">No reservations found</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

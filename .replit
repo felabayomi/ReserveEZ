@@ -1,4 +1,4 @@
-modules = ["python-3.11"]
+modules = ["python-3.11", "postgresql-16"]
 [agent]
 expertMode = true
 integrations = ["flask_stripe:1.0.0", "python_sendgrid:1.0.0"]
@@ -17,84 +17,24 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "EasyDesk Server"
+args = "TableGuard Server"
 
 [[workflows.workflow]]
-name = "EasyDesk Server"
+name = "TableGuard Server"
 author = "agent"
+
+[workflows.workflow.metadata]
+outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "python main.py"
 waitForPort = 5000
 
-[workflows.workflow.metadata]
-outputType = "webview"
-
 [[ports]]
 localPort = 5000
 externalPort = 80
 
-[[ports]]
-localPort = 33569
-externalPort = 4200
-
-[[ports]]
-localPort = 33929
-externalPort = 9000
-
-[[ports]]
-localPort = 35937
-externalPort = 5173
-
-[[ports]]
-localPort = 36013
-externalPort = 8080
-
-[[ports]]
-localPort = 36781
-externalPort = 3001
-
-[[ports]]
-localPort = 37291
-externalPort = 8000
-
-[[ports]]
-localPort = 37777
-externalPort = 8008
-
-[[ports]]
-localPort = 38811
-externalPort = 6000
-
-[[ports]]
-localPort = 39255
-externalPort = 8099
-
-[[ports]]
-localPort = 40971
-externalPort = 6800
-
-[[ports]]
-localPort = 44751
-externalPort = 5000
-
-[[ports]]
-localPort = 45275
-externalPort = 3000
-
-[[ports]]
-localPort = 45629
-externalPort = 3003
-
-[[ports]]
-localPort = 45727
-externalPort = 8081
-
-[[ports]]
-localPort = 45773
-externalPort = 3002
-
 [deployment]
 deploymentTarget = "autoscale"
-run = ["gunicorn", "--bind=0.0.0.0:5000", "--reuse-port", "main:app"]
+run = ["gunicorn", "--bind=0.0.0.0:5000", "--reuse-port", "--workers=2", "main:app"]

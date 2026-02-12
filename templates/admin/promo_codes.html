@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}Promo Codes - TableGuard{% endblock %}
+{% block content %}
+<h2 class="mb-4" style="color: var(--tg-accent);">Promo Codes</h2>
+
+<div class="card p-3 mb-4">
+  <div class="table-responsive">
+    <table class="table table-dark table-hover">
+      <thead>
+        <tr>
+          <th>Code</th>
+          <th>Type</th>
+          <th>Value</th>
+          <th>Restaurant</th>
+          <th>Active</th>
+          <th>Uses</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in promo_codes %}
+        <tr>
+          <td><code>{{ p.code }}</code></td>
+          <td>{{ p.discount_type|capitalize }}</td>
+          <td>{{ p.discount_value }}{{ '%' if p.discount_type == 'percent' else '' }}</td>
+          <td>{{ p.linked_restaurant.name if p.linked_restaurant else 'All' }}</td>
+          <td>
+            {% if p.active %}
+              <span class="badge bg-success">Active</span>
+            {% else %}
+              <span class="badge bg-secondary">Inactive</span>
+            {% endif %}
+          </td>
+          <td>{{ p.current_uses }}{{ '/' ~ p.max_uses if p.max_uses else '' }}</td>
+          <td>
+            <form method="POST" action="/admin/promo-code/{{ p.id }}/toggle" class="d-inline">
+              <button type="submit" class="btn btn-sm btn-outline-light">{{ 'Deactivate' if p.active else 'Activate' }}</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="7" class="text-center text-muted">No promo codes</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card p-4">
+  <h5 class="mb-3">Add Promo Code</h5>
+  <form method="POST" action="/admin/promo-codes">
+    <div class="row g-3">
+      <div class="col-md-4">
+        <label class="form-label">Code</label>
+        <input type="text" class="form-control" name="code" required>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Discount Type</label>
+        <select class="form-select" name="discount_type">
+          <option value="percent">Percent</option>
+          <option value="flat">Flat</option>
+          <option value="free">Free</option>
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Discount Value</label>
+        <input type="number" class="form-control" name="discount_value" value="10">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Restaurant</label>
+        <select class="form-select" name="restaurant_id">
+          <option value="">All Restaurants</option>
+          {% for r in restaurants %}
+          <option value="{{ r.id }}">{{ r.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Max Uses</label>
+        <input type="number" class="form-control" name="max_uses" placeholder="Unlimited">
+      </div>
+      <div class="col-md-4 d-flex align-items-end">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="waive_deposit" name="waive_deposit">
+          <label class="form-check-label" for="waive_deposit">Waive Deposit</label>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Valid From</label>
+        <input type="date" class="form-control" name="valid_from">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Valid To</label>
+        <input type="date" class="form-control" name="valid_to">
+      </div>
+      <div class="col-md-4 d-flex align-items-end">
+        <button type="submit" class="btn btn-accent">Add Promo Code</button>
+      </div>
+    </div>
+  </form>
+</div>
+{% endblock %}

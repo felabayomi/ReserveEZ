@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Table Available</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f4f4f4;font-family:Arial,Helvetica,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f4;padding:20px 0;">
+<tr>
+<td align="center">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+
+<tr>
+<td style="background-color:#e94560;padding:30px 40px;text-align:center;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+<tr>
+<td style="color:#ffffff;font-size:28px;font-weight:bold;letter-spacing:1px;">TableGuard</td>
+</tr>
+<tr>
+<td style="color:rgba(255,255,255,0.85);font-size:13px;padding-top:4px;">Restaurant Reservations</td>
+</tr>
+</table>
+</td>
+</tr>
+
+<tr>
+<td style="padding:40px 40px 10px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+<tr>
+<td style="text-align:center;">
+<div style="font-size:48px;line-height:1;">&#127881;</div>
+<h1 style="margin:10px 0 5px;font-size:24px;color:#1a1a2e;">A Table is Available!</h1>
+<p style="margin:0 0 20px;color:#555555;font-size:14px;">Great news, {{ entry.guest_name }}! A spot has opened up at your requested restaurant.</p>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+
+<tr>
+<td style="padding:0 40px 20px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f9f9f9;border-radius:6px;border:1px solid #eeeeee;">
+<tr>
+<td style="padding:20px 24px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+<tr>
+<td style="padding:8px 0;color:#888888;font-size:12px;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #eeeeee;" colspan="2">Availability Details</td>
+</tr>
+<tr>
+<td style="padding:12px 0 8px;color:#555555;font-size:14px;width:140px;">Restaurant</td>
+<td style="padding:12px 0 8px;color:#1a1a2e;font-size:14px;font-weight:bold;">{{ entry.restaurant.name }}</td>
+</tr>
+<tr>
+<td style="padding:8px 0;color:#555555;font-size:14px;">Date</td>
+<td style="padding:8px 0;color:#1a1a2e;font-size:14px;font-weight:bold;">{{ entry.desired_date.strftime('%A, %B %-d, %Y') }}</td>
+</tr>
+<tr>
+<td style="padding:8px 0;color:#555555;font-size:14px;">Party Size</td>
+<td style="padding:8px 0;color:#1a1a2e;font-size:14px;font-weight:bold;">{{ entry.party_size }} {{ 'guest' if entry.party_size == 1 else 'guests' }}</td>
+</tr>
+</table>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+
+{% if slots %}
+<tr>
+<td style="padding:0 40px 20px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+<tr>
+<td style="color:#555555;font-size:13px;font-weight:bold;padding-bottom:10px;">Available Time Slots:</td>
+</tr>
+<tr>
+<td>
+<table role="presentation" cellpadding="0" cellspacing="0">
+{% for slot in slots %}
+<tr>
+<td style="padding:4px 0;">
+<span style="display:inline-block;background-color:#f0f0f0;color:#1a1a2e;padding:6px 16px;border-radius:4px;font-size:14px;font-weight:bold;border:1px solid #dddddd;">{{ slot }}</span>
+</td>
+</tr>
+{% endfor %}
+</table>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+{% endif %}
+
+<tr>
+<td style="padding:10px 40px 20px;text-align:center;">
+<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto;">
+<tr>
+<td>
+<a href="{{ reserve_url }}" style="display:inline-block;background-color:#e94560;color:#ffffff;text-decoration:none;padding:16px 40px;border-radius:6px;font-size:16px;font-weight:bold;">Book Now</a>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+
+<tr>
+<td style="padding:0 40px 30px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#fff8e1;border-radius:6px;border:1px solid #ffecb3;">
+<tr>
+<td style="padding:14px 20px;color:#6d4c00;font-size:13px;">
+<strong>Act Fast:</strong> This spot will be held for 2 hours. After that, it will be released to other guests on the waitlist.
+</td>
+</tr>
+</table>
+</td>
+</tr>
+
+<tr>
+<td style="background-color:#f4f4f4;padding:24px 40px;text-align:center;border-top:1px solid #eeeeee;">
+<p style="margin:0 0 8px;color:#999999;font-size:12px;">This email was sent by TableGuard on behalf of {{ entry.restaurant.name }}.</p>
+<p style="margin:0;color:#bbbbbb;font-size:11px;">You received this email because you joined the waitlist. If you no longer wish to receive these notifications, you may disregard this email.</p>
+</td>
+</tr>
+
+</table>
+</td>
+</tr>
+</table>
+</body>
+</html>

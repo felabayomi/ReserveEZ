@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if restaurant else 'Add' }} Restaurant - TableGuard{% endblock %}
+{% block content %}
+<h2 class="mb-4" style="color: var(--tg-accent);">{{ 'Edit' if restaurant else 'Add' }} Restaurant</h2>
+
+<form method="POST" action="{{ '/admin/restaurant/' ~ restaurant.id ~ '/edit' if restaurant else '/admin/restaurant/new' }}">
+  <div class="card p-4 mb-4">
+    <h5 class="mb-3">Basic Information</h5>
+    <div class="row g-3">
+      <div class="col-md-6">
+        <label for="name" class="form-label">Name</label>
+        <input type="text" class="form-control" id="name" name="name" value="{{ restaurant.name if restaurant else '' }}" required>
+      </div>
+      <div class="col-md-6">
+        <label for="cuisine_type" class="form-label">Cuisine Type</label>
+        <select class="form-select" id="cuisine_type" name="cuisine_type">
+          {% for ct in cuisine_types %}
+          <option value="{{ ct }}" {{ 'selected' if restaurant and restaurant.cuisine_type == ct }}>{{ ct }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12">
+        <label for="description" class="form-label">Description</label>
+        <textarea class="form-control" id="description" name="description" rows="3">{{ restaurant.description if restaurant else '' }}</textarea>
+      </div>
+      <div class="col-md-6">
+        <label for="address" class="form-label">Address</label>
+        <input type="text" class="form-control" id="address" name="address" value="{{ restaurant.address if restaurant else '' }}">
+      </div>
+      <div class="col-md-3">
+        <label for="phone" class="form-label">Phone</label>
+        <input type="text" class="form-control" id="phone" name="phone" value="{{ restaurant.phone if restaurant else '' }}">
+      </div>
+      <div class="col-md-3">
+        <label for="email" class="form-label">Email</label>
+        <input type="email" class="form-control" id="email" name="email" value="{{ restaurant.email if restaurant else '' }}">
+      </div>
+      <div class="col-12">
+        <label for="image_url" class="form-label">Image URL</label>
+        <input type="text" class="form-control" id="image_url" name="image_url" value="{{ restaurant.image_url if restaurant else '' }}">
+      </div>
+    </div>
+  </div>
+
+  <div class="card p-4 mb-4">
+    <h5 class="mb-3">Reservation Settings</h5>
+    <div class="row g-3">
+      <div class="col-md-6">
+        <label for="slot_duration_minutes" class="form-label">Slot Duration (minutes)</label>
+        <input type="number" class="form-control" id="slot_duration_minutes" name="slot_duration_minutes" value="{{ restaurant.slot_duration_minutes if restaurant else 90 }}">
+      </div>
+      <div class="col-md-6">
+        <label for="max_party_size" class="form-label">Max Party Size</label>
+        <input type="number" class="form-control" id="max_party_size" name="max_party_size" value="{{ restaurant.max_party_size if restaurant else 12 }}">
+      </div>
+    </div>
+  </div>
+
+  <div class="card p-4 mb-4">
+    <h5 class="mb-3">Deposit Settings</h5>
+    <div class="row g-3">
+      <div class="col-md-4">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="require_deposit" name="require_deposit" {{ 'checked' if not restaurant or restaurant.require_deposit }}>
+          <label class="form-check-label" for="require_deposit">Require Deposit</label>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <label for="deposit_type" class="form-label">Deposit Type</label>
+        <select class="form-select" id="deposit_type" name="deposit_type">
+          <option value="per_person" {{ 'selected' if restaurant and restaurant.deposit_type == 'per_person' }}>Per Person</option>
+          <option value="flat" {{ 'selected' if restaurant and restaurant.deposit_type == 'flat' }}>Flat</option>
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label for="deposit_amount" class="form-label">Deposit Amount ($)</label>
+        <input type="number" step="0.01" class="form-control" id="deposit_amount" name="deposit_amount" value="{{ '%.2f'|format(restaurant.deposit_amount_cents / 100) if restaurant else '10.00' }}">
+      </div>
+    </div>
+  </div>
+
+  <div class="card p-4 mb-4">
+    <h5 class="mb-3">Card Hold</h5>
+    <div class="form-check">
+      <input class="form-check-input" type="checkbox" id="require_card_hold" name="require_card_hold" {{ 'checked' if not restaurant or restaurant.require_card_hold }}>
+      <label class="form-check-label" for="require_card_hold">Require Card Hold</label>
+    </div>
+  </div>
+
+  <div class="card p-4 mb-4">
+    <h5 class="mb-3">Cancellation & Fees</h5>
+    <div class="row g-3">
+      <div class="col-md-4">
+        <label for="cancellation_cutoff_hours" class="form-label">Cancellation Cutoff (hours)</label>
+        <input type="number" class="form-control" id="cancellation_cutoff_hours" name="cancellation_cutoff_hours" value="{{ restaurant.cancellation_cutoff_hours if restaurant else 24 }}">
+      </div>
+      <div class="col-md-4">
+        <label for="no_show_fee" class="form-label">No-Show Fee ($)</label>
+        <input type="number" step="0.01" class="form-control" id="no_show_fee" name="no_show_fee" value="{{ '%.2f'|format(restaurant.no_show_fee_cents / 100) if restaurant else '25.00' }}">
+      </div>
+      <div class="col-md-4">
+        <label for="late_cancel_fee" class="form-label">Late Cancel Fee ($)</label>
+        <input type="number" step="0.01" class="form-control" id="late_cancel_fee" name="late_cancel_fee" value="{{ '%.2f'|format(restaurant.late_cancel_fee_cents / 100) if restaurant else '15.00' }}">
+      </div>
+    </div>
+  </div>
+
+  {% if restaurant %}
+  <div class="card p-4 mb-4">
+    <h5 class="mb-3">Status</h5>
+    <div class="form-check">
+      <input class="form-check-input" type="checkbox" id="active" name="active" {{ 'checked' if restaurant.active }}>
+      <label class="form-check-label" for="active">Active</label>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="card p-4 mb-4">
+    <h5 class="mb-3">Opening Hours</h5>
+    {% set days = [('mon', 'Monday'), ('tue', 'Tuesday'), ('wed', 'Wednesday'), ('thu', 'Thursday'), ('fri', 'Friday'), ('sat', 'Saturday'), ('sun', 'Sunday')] %}
+    {% set hours = restaurant.get_opening_hours() if restaurant else {} %}
+    {% for day_key, day_name in days %}
+    <div class="mb-3">
+      <h6>{{ day_name }}</h6>
+      {% set day_hours = hours.get(day_key, [['', ''], ['', '']]) %}
+      {% for i in range(2) %}
+      {% set period = day_hours[i] if i < day_hours|length else ['', ''] %}
+      <div class="row g-2 mb-2">
+        <div class="col-md-5">
+          <input type="time" class="form-control" name="{{ day_key }}_open[]" value="{{ period[0] if period[0] else '' }}">
+        </div>
+        <div class="col-md-1 text-center pt-2">to</div>
+        <div class="col-md-5">
+          <input type="time" class="form-control" name="{{ day_key }}_close[]" value="{{ period[1] if period[1] else '' }}">
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+
+  <button type="submit" class="btn btn-accent btn-lg">{{ 'Save Changes' if restaurant else 'Add Restaurant' }}</button>
+  <a href="/admin/restaurants" class="btn btn-outline-light btn-lg ms-2">Cancel</a>
+</form>
+{% endblock %}
