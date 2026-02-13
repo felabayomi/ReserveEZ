@@ -37,6 +37,12 @@ class Restaurant(db.Model):
     active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=dt.datetime.utcnow)
 
+    stripe_connect_id = db.Column(db.String(200))
+    stripe_connect_status = db.Column(db.String(50), default="not_connected")
+    stripe_charges_enabled = db.Column(db.Boolean, default=False)
+    stripe_payouts_enabled = db.Column(db.Boolean, default=False)
+    platform_fee_percent = db.Column(db.Integer, default=10)
+
     tables = db.relationship("Table", backref="restaurant", lazy=True)
     reservations = db.relationship("Reservation", backref="restaurant", lazy=True)
 
@@ -206,3 +212,20 @@ class RestaurantUser(db.Model):
 
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
+
+
+class PaymentTransaction(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    reservation_id = db.Column(db.Integer, db.ForeignKey("reservation.id"), nullable=True)
+    restaurant_id = db.Column(db.Integer, db.ForeignKey("restaurant.id"), nullable=False)
+    transaction_type = db.Column(db.String(50), nullable=False)
+    amount_cents = db.Column(db.Integer, nullable=False)
+    platform_fee_cents = db.Column(db.Integer, default=0)
+    restaurant_amount_cents = db.Column(db.Integer, default=0)
+    stripe_payment_intent_id = db.Column(db.String(200))
+    stripe_transfer_id = db.Column(db.String(200))
+    status = db.Column(db.String(30), default="pending")
+    created_at = db.Column(db.DateTime, default=dt.datetime.utcnow)
+
+    reservation = db.relationship("Reservation", backref="transactions")
+    restaurant = db.relationship("Restaurant", backref="transactions")

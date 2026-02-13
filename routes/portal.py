@@ -4,9 +4,10 @@ from flask import (Blueprint, render_template, request, redirect, url_for, abort
                    flash, session)
 import stripe
 from models import db, Restaurant, Table, Reservation, NoShowRecord, WaitlistEntry, RestaurantUser
-from config import CUISINE_TYPES
+from config import CUISINE_TYPES, BASE_URL
 from helpers import as_money, make_slug
 from email_service import send_no_show_email
+from models import PaymentTransaction
 
 portal_bp = Blueprint("portal", __name__)
 
@@ -288,19 +289,40 @@ def reservation_status(res_id):
                 restaurant_id=r.restaurant_id,
                 reservation_id=r.id,
             )
-            if r.restaurant.no_show_fee_cents > 0 and r.stripe_payment_method_id:
+            fee_amount = r.restaurant.no_show_fee_cents
+            if fee_amount > 0 and r.stripe_payment_method_id:
                 try:
-                    pi = stripe.PaymentIntent.create(
-                        amount=r.restaurant.no_show_fee_cents,
-                        currency="usd",
-                        payment_method=r.stripe_payment_method_id,
-                        confirm=True,
-                        automatic_payment_methods={"enabled": True, "allow_redirects": "never"},
-                        description=f"No-show fee for {r.guest_name} at {r.restaurant.name}",
-                    )
-                    record.fee_charged_cents = r.restaurant.no_show_fee_cents
+                    ns_kwargs = {
+                        "amount": fee_amount,
+                        "currency": "usd",
+                        "payment_method": r.stripe_payment_method_id,
+                        "confirm": True,
+                        "automatic_payment_methods": {"enabled": True, "allow_redirects": "never"},
+                        "description": f"No-show fee for {r.guest_name} at {r.restaurant.name}",
+                    }
+
+                    ns_platform_fee = 0
+                    if r.restaurant.stripe_connect_id and r.restaurant.stripe_charges_enabled:
+                        ns_platform_fee = int(fee_amount * r.restaurant.platform_fee_percent / 100)
+                        ns_kwargs["application_fee_amount"] = ns_platform_fee
+                        ns_kwargs["transfer_data"] = {"destination": r.restaurant.stripe_connect_id}
+
+                    pi = stripe.PaymentIntent.create(**ns_kwargs)
+                    record.fee_charged_cents = fee_amount
                     r.no_show_fee_charged = True
-                    r.no_show_fee_amount_cents = r.restaurant.no_show_fee_cents
+                    r.no_show_fee_amount_cents = fee_amount
+
+                    ns_txn = PaymentTransaction(
+                        reservation_id=r.id,
+                        restaurant_id=r.restaurant_id,
+                        transaction_type="no_show_fee",
+                        amount_cents=fee_amount,
+                        platform_fee_cents=ns_platform_fee if r.restaurant.stripe_connect_id and r.restaurant.stripe_charges_enabled else fee_amount,
+                        restaurant_amount_cents=fee_amount - ns_platform_fee if r.restaurant.stripe_connect_id and r.restaurant.stripe_charges_enabled else 0,
+                        stripe_payment_intent_id=pi.id,
+                        status="completed"
+                    )
+                    db.session.add(ns_txn)
                 except Exception as e:
                     print(f"[NO-SHOW FEE ERROR] {e}")
             db.session.add(record)
@@ -348,3 +370,98 @@ def no_show_stats():
                            total_fees=total_fees,
                            repeat_offenders=repeat_offenders,
                            as_money=as_money)
+
+
+@portal_bp.route("/connect-stripe", methods=["POST"])
+def connect_stripe():
+    require_portal_login()
+    user = get_portal_user()
+    restaurant = user.restaurant
+
+    if not restaurant.stripe_connect_id:
+        account = stripe.Account.create(
+            type="express",
+            country="US",
+            email=user.email,
+            capabilities={"card_payments": {"requested": True}, "transfers": {"requested": True}},
+            business_type="company",
+            metadata={"restaurant_id": str(restaurant.id), "restaurant_name": restaurant.name}
+        )
+        restaurant.stripe_connect_id = account.id
+        restaurant.stripe_connect_status = "pending"
+        db.session.commit()
+
+    account_link = stripe.AccountLink.create(
+        account=restaurant.stripe_connect_id,
+        refresh_url=BASE_URL + "/portal/connect-stripe/refresh",
+        return_url=BASE_URL + "/portal/connect-stripe/complete",
+        type="account_onboarding",
+    )
+    return redirect(account_link.url)
+
+
+@portal_bp.route("/connect-stripe/complete")
+def connect_stripe_complete():
+    require_portal_login()
+    user = get_portal_user()
+    restaurant = user.restaurant
+
+    if restaurant.stripe_connect_id:
+        account = stripe.Account.retrieve(restaurant.stripe_connect_id)
+        restaurant.stripe_charges_enabled = account.charges_enabled
+        restaurant.stripe_payouts_enabled = account.payouts_enabled
+        if account.charges_enabled:
+            restaurant.stripe_connect_status = "active"
+        db.session.commit()
+
+    flash("Stripe account connected successfully!" if restaurant.stripe_charges_enabled else "Please complete your Stripe setup.", "success" if restaurant.stripe_charges_enabled else "warning")
+    return redirect(url_for("portal.dashboard"))
+
+
+@portal_bp.route("/connect-stripe/refresh")
+def connect_stripe_refresh():
+    require_portal_login()
+    return redirect(url_for("portal.connect_stripe"), code=307)
+
+
+@portal_bp.route("/stripe-dashboard")
+def stripe_dashboard_link():
+    require_portal_login()
+    user = get_portal_user()
+    restaurant = user.restaurant
+    if restaurant.stripe_connect_id:
+        login_link = stripe.Account.create_login_link(restaurant.stripe_connect_id)
+        return redirect(login_link.url)
+    flash("Please connect your Stripe account first.", "error")
+    return redirect(url_for("portal.dashboard"))
+
+
+@portal_bp.route("/earnings")
+def earnings():
+    require_portal_login()
+    user = get_portal_user()
+    restaurant = user.restaurant
+    if not restaurant:
+        abort(404)
+
+    days = int(request.args.get("days", 30))
+    since = dt.datetime.utcnow() - dt.timedelta(days=days)
+
+    transactions = PaymentTransaction.query.filter(
+        PaymentTransaction.restaurant_id == restaurant.id,
+        PaymentTransaction.created_at >= since,
+    ).order_by(PaymentTransaction.created_at.desc()).all()
+
+    total_revenue = sum(t.amount_cents for t in transactions if t.status == "completed" and t.transaction_type != "refund")
+    total_platform_fees = sum(t.platform_fee_cents for t in transactions if t.status == "completed" and t.transaction_type != "refund")
+    total_restaurant_earnings = sum(t.restaurant_amount_cents for t in transactions if t.status == "completed" and t.transaction_type != "refund")
+    total_refunds = sum(t.amount_cents for t in transactions if t.transaction_type == "refund")
+
+    return render_template("portal/earnings.html",
+                           restaurant=restaurant,
+                           transactions=transactions,
+                           total_revenue=total_revenue,
+                           total_platform_fees=total_platform_fees,
+                           total_restaurant_earnings=total_restaurant_earnings,
+                           total_refunds=total_refunds,
+                           days=days, as_money=as_money)

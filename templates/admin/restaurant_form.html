@@ -105,6 +105,32 @@
     </div>
   </div>
 
+  <div class="card p-4 mb-4">
+    <h5 class="mb-3">Platform Fee</h5>
+    <div class="row g-3">
+      <div class="col-md-4">
+        <label for="platform_fee_percent" class="form-label">Platform Fee (%)</label>
+        <input type="number" min="0" max="100" class="form-control" id="platform_fee_percent" name="platform_fee_percent" value="{{ restaurant.platform_fee_percent if restaurant else 10 }}">
+        <small class="text-muted">Percentage of each transaction kept by the platform</small>
+      </div>
+      {% if restaurant and restaurant.stripe_connect_id %}
+      <div class="col-md-8 d-flex align-items-center">
+        <div>
+          <span class="me-2">Stripe Connect:</span>
+          {% if restaurant.stripe_connect_status == 'active' %}
+            <span class="badge bg-success">Connected</span>
+          {% elif restaurant.stripe_connect_status == 'pending' %}
+            <span class="badge bg-warning text-dark">Pending</span>
+          {% else %}
+            <span class="badge bg-secondary">Not Connected</span>
+          {% endif %}
+          <br><small class="text-muted">Account: {{ restaurant.stripe_connect_id }}</small>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
   {% if restaurant %}
   <div class="card p-4 mb-4">
     <h5 class="mb-3">Status</h5>

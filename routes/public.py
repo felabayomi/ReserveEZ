@@ -3,7 +3,7 @@ import json
 from flask import (Blueprint, render_template, request, redirect, url_for, abort,
                    jsonify, flash, make_response)
 import stripe
-from models import db, Restaurant, Table, Reservation, WaitlistEntry, NoShowRecord, PromoCode
+from models import db, Restaurant, Table, Reservation, WaitlistEntry, NoShowRecord, PromoCode, PaymentTransaction
 from config import STRIPE_PUBLIC_KEY, STRIPE_WEBHOOK_SECRET, CUISINE_TYPES, BASE_URL
 from helpers import (as_money, generate_time_slots, get_day_key, find_available_tables,
                      get_no_show_count, calculate_end_time, notify_waitlist_for_slot, make_slug)
@@ -194,17 +194,40 @@ def reserve(slug):
 
         if actual_deposit > 0 and not waive_deposit and payment_method_id and stripe.api_key:
             try:
-                intent = stripe.PaymentIntent.create(
-                    amount=actual_deposit,
-                    currency="usd",
-                    payment_method=payment_method_id,
-                    confirm=True,
-                    automatic_payment_methods={"enabled": True, "allow_redirects": "never"},
-                    metadata={"reservation_uuid": reservation.uuid,
-                              "restaurant": restaurant.name}
-                )
+                payment_kwargs = {
+                    "amount": actual_deposit,
+                    "currency": "usd",
+                    "payment_method": payment_method_id,
+                    "confirm": True,
+                    "automatic_payment_methods": {"enabled": True, "allow_redirects": "never"},
+                    "metadata": {"reservation_uuid": reservation.uuid,
+                                 "restaurant": restaurant.name}
+                }
+
+                platform_fee = 0
+                if restaurant.stripe_connect_id and restaurant.stripe_charges_enabled:
+                    platform_fee = int(actual_deposit * restaurant.platform_fee_percent / 100)
+                    payment_kwargs["application_fee_amount"] = platform_fee
+                    payment_kwargs["transfer_data"] = {"destination": restaurant.stripe_connect_id}
+
+                intent = stripe.PaymentIntent.create(**payment_kwargs)
                 reservation.stripe_payment_intent_id = intent.id
                 reservation.deposit_paid = True
+
+                db.session.add(reservation)
+                db.session.flush()
+
+                txn = PaymentTransaction(
+                    reservation_id=reservation.id,
+                    restaurant_id=restaurant.id,
+                    transaction_type="deposit",
+                    amount_cents=actual_deposit,
+                    platform_fee_cents=platform_fee if restaurant.stripe_connect_id and restaurant.stripe_charges_enabled else actual_deposit,
+                    restaurant_amount_cents=actual_deposit - platform_fee if restaurant.stripe_connect_id and restaurant.stripe_charges_enabled else 0,
+                    stripe_payment_intent_id=intent.id,
+                    status="completed"
+                )
+                db.session.add(txn)
             except stripe.StripeError as e:
                 flash(f"Payment failed: {str(e)}", "error")
                 return redirect(url_for("public.reserve", slug=slug, date=date_str,
@@ -266,6 +289,17 @@ def cancel_reservation(res_uuid, token):
         if reservation.deposit_paid and reservation.stripe_payment_intent_id and stripe.api_key:
             try:
                 stripe.Refund.create(payment_intent=reservation.stripe_payment_intent_id)
+                txn = PaymentTransaction(
+                    reservation_id=reservation.id,
+                    restaurant_id=reservation.restaurant_id,
+                    transaction_type="refund",
+                    amount_cents=reservation.deposit_amount_cents,
+                    platform_fee_cents=0,
+                    restaurant_amount_cents=0,
+                    stripe_payment_intent_id=reservation.stripe_payment_intent_id,
+                    status="completed"
+                )
+                db.session.add(txn)
             except Exception as e:
                 print(f"Refund error: {e}")
     else:
@@ -413,13 +447,27 @@ def stripe_webhook():
     else:
         event = json.loads(payload)
 
-    if event.get("type") == "payment_intent.succeeded":
+    event_type = event.get("type")
+
+    if event_type == "payment_intent.succeeded":
         pi = event["data"]["object"]
         res_uuid = pi.get("metadata", {}).get("reservation_uuid")
         if res_uuid:
             reservation = Reservation.query.filter_by(uuid=res_uuid).first()
             if reservation:
                 reservation.deposit_paid = True
+                db.session.commit()
+
+    elif event_type == "account.updated":
+        account_data = event["data"]["object"]
+        account_id = account_data.get("id")
+        if account_id:
+            restaurant = Restaurant.query.filter_by(stripe_connect_id=account_id).first()
+            if restaurant:
+                restaurant.stripe_charges_enabled = account_data.get("charges_enabled", False)
+                restaurant.stripe_payouts_enabled = account_data.get("payouts_enabled", False)
+                if account_data.get("charges_enabled"):
+                    restaurant.stripe_connect_status = "active"
                 db.session.commit()
 
     return "", 200
@@ -495,19 +543,39 @@ def cron_process_no_shows():
             fee_amount = r.restaurant.no_show_fee_cents
             if r.stripe_payment_method_id and stripe.api_key and fee_amount > 0:
                 try:
-                    charge = stripe.PaymentIntent.create(
-                        amount=fee_amount,
-                        currency="usd",
-                        payment_method=r.stripe_payment_method_id,
-                        confirm=True,
-                        automatic_payment_methods={"enabled": True, "allow_redirects": "never"},
-                        metadata={"type": "no_show_fee",
-                                  "reservation_uuid": r.uuid,
-                                  "restaurant": r.restaurant.name}
-                    )
+                    ns_kwargs = {
+                        "amount": fee_amount,
+                        "currency": "usd",
+                        "payment_method": r.stripe_payment_method_id,
+                        "confirm": True,
+                        "automatic_payment_methods": {"enabled": True, "allow_redirects": "never"},
+                        "metadata": {"type": "no_show_fee",
+                                     "reservation_uuid": r.uuid,
+                                     "restaurant": r.restaurant.name}
+                    }
+
+                    ns_platform_fee = 0
+                    if r.restaurant.stripe_connect_id and r.restaurant.stripe_charges_enabled:
+                        ns_platform_fee = int(fee_amount * r.restaurant.platform_fee_percent / 100)
+                        ns_kwargs["application_fee_amount"] = ns_platform_fee
+                        ns_kwargs["transfer_data"] = {"destination": r.restaurant.stripe_connect_id}
+
+                    charge = stripe.PaymentIntent.create(**ns_kwargs)
                     r.no_show_fee_charged = True
                     r.no_show_fee_amount_cents = fee_amount
                     record.fee_charged_cents = fee_amount
+
+                    ns_txn = PaymentTransaction(
+                        reservation_id=r.id,
+                        restaurant_id=r.restaurant_id,
+                        transaction_type="no_show_fee",
+                        amount_cents=fee_amount,
+                        platform_fee_cents=ns_platform_fee if r.restaurant.stripe_connect_id and r.restaurant.stripe_charges_enabled else fee_amount,
+                        restaurant_amount_cents=fee_amount - ns_platform_fee if r.restaurant.stripe_connect_id and r.restaurant.stripe_charges_enabled else 0,
+                        stripe_payment_intent_id=charge.id,
+                        status="completed"
+                    )
+                    db.session.add(ns_txn)
                 except Exception as e:
                     print(f"No-show charge error: {e}")
 

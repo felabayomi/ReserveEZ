@@ -20,6 +20,27 @@
 </div>
 {% endif %}
 
+{% if restaurant.stripe_connect_status == 'active' %}
+<div class="alert alert-success d-flex align-items-center justify-content-between" role="alert">
+  <div><strong>Stripe Connected</strong> &mdash; You're set up to receive payouts.</div>
+  <a href="/portal/stripe-dashboard" class="btn btn-sm btn-outline-light">Stripe Dashboard</a>
+</div>
+{% elif restaurant.stripe_connect_status == 'pending' %}
+<div class="alert alert-warning d-flex align-items-center justify-content-between" role="alert">
+  <div><strong>Stripe Setup Incomplete</strong> &mdash; Complete your Stripe setup to receive payouts.</div>
+  <form method="POST" action="/portal/connect-stripe" class="d-inline">
+    <button type="submit" class="btn btn-sm btn-accent">Complete Setup</button>
+  </form>
+</div>
+{% else %}
+<div class="alert alert-info d-flex align-items-center justify-content-between" role="alert">
+  <div><strong>Connect Stripe</strong> &mdash; Connect your Stripe account to receive payouts from reservations.</div>
+  <form method="POST" action="/portal/connect-stripe" class="d-inline">
+    <button type="submit" class="btn btn-sm btn-accent">Connect Stripe</button>
+  </form>
+</div>
+{% endif %}
+
 <div class="row g-3 mb-4">
   <div class="col-md-4">
     <div class="card p-3 text-center">
