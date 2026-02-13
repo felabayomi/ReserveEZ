@@ -82,8 +82,8 @@ BASE_URL = f"https://{YOUR_DOMAIN}"
 serializer = URLSafeTimedSerializer(app.config["SECRET_KEY"])
 
 CUISINE_TYPES = [
-    "American", "Italian", "Mexican", "Chinese", "Japanese", "Indian",
-    "Thai", "French", "Mediterranean", "Korean", "Vietnamese", "Greek",
+    "African", "American", "Italian", "Mexican", "Chinese", "Japanese", "Indian",
+    "Jamaican", "Nigerian", "Thai", "French", "Mediterranean", "Korean", "Vietnamese", "Greek",
     "Spanish", "Middle Eastern", "Caribbean", "Brazilian", "Ethiopian",
     "Seafood", "Steakhouse", "Vegetarian/Vegan", "Fusion", "Other"
 ]
