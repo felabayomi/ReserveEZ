@@ -50,12 +50,22 @@ Branding: "ReserveEZ" (Reserve Table Easy), an Errand Easy company. All rights r
 
 ### Authentication & Authorization
 - **Simple admin access**: Password-based admin panel (ADMIN_PASSWORD env var)
-- **No user accounts**: Guest booking with name + email + phone
+- **Restaurant portal**: Email/password accounts for restaurant owners (RestaurantUser model)
+- **No customer accounts**: Guest booking with name + email + phone
 - **Secure self-service**: Signed tokens (itsdangerous) for manage/cancel links
 
-### Admin Dashboard
+### Restaurant Portal (/portal)
+- **Registration**: Restaurant owners sign up with their details and restaurant info
+- **Pending approval**: New restaurants start inactive, admin approves to go live
+- **Dashboard**: Today's reservations, upcoming count, no-show stats for their restaurant
+- **Restaurant settings**: Edit restaurant details, policies, opening hours
+- **Table management**: Add/edit/delete tables
+- **Reservation management**: Filter by date/status, mark seated/no-show/completed
+- **No-show statistics**: Track repeat offenders and fee collection
+
+### Admin Dashboard (/admin)
 - **Overview**: Today's reservations, upcoming count, no-show stats, waitlist count
-- **Restaurant management**: Add/edit restaurants, configure policies and opening hours
+- **Restaurant management**: Add/edit restaurants, approve/reject portal submissions
 - **Table management**: Add/edit/delete tables per restaurant
 - **Reservation management**: Filter by date/status, mark seated/no-show/completed
 - **No-show statistics**: Repeat offenders, per-restaurant stats, fee collection totals

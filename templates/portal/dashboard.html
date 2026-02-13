@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}Portal Dashboard - ReserveEZ{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="mb-0" style="color: var(--tg-accent);">Restaurant Portal</h2>
+  <a href="/portal/logout" class="btn btn-outline-light btn-sm">Logout</a>
+</div>
+
+<p class="mb-4">Welcome, <strong>{{ user.name }}</strong> &mdash; {{ restaurant.name }}</p>
+
+{% if not user.approved %}
+<div class="alert alert-warning alert-dismissible fade show" role="alert">
+  Your restaurant is pending approval by ReserveEZ admin. You can still set up your details.
+  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% elif not restaurant.active %}
+<div class="alert alert-info alert-dismissible fade show" role="alert">
+  Your restaurant is not yet visible to customers.
+  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+<div class="row g-3 mb-4">
+  <div class="col-md-4">
+    <div class="card p-3 text-center">
+      <h3 style="color: var(--tg-accent);">{{ upcoming_count }}</h3>
+      <small class="text-muted">Upcoming Reservations</small>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card p-3 text-center">
+      <h3 style="color: var(--tg-accent);">{{ no_show_count }}</h3>
+      <small class="text-muted">No-Shows (30 days)</small>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card p-3 text-center">
+      <h3 style="color: var(--tg-accent);">{{ waitlist_count }}</h3>
+      <small class="text-muted">Waitlist Entries</small>
+    </div>
+  </div>
+</div>
+
+<div class="card p-3 mb-4">
+  <h4 class="mb-3">Today's Reservations</h4>
+  <div class="table-responsive">
+    <table class="table table-dark table-hover">
+      <thead>
+        <tr>
+          <th>Time</th>
+          <th>Guest</th>
+          <th>Party Size</th>
+          <th>Phone</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in today_reservations %}
+        <tr>
+          <td>{{ r.reservation_time.strftime('%H:%M') }}</td>
+          <td>{{ r.guest_name }}</td>
+          <td>{{ r.party_size }}</td>
+          <td>{{ r.guest_phone }}</td>
+          <td>
+            {% if r.status == 'confirmed' %}
+              <span class="badge bg-success">Confirmed</span>
+            {% elif r.status == 'seated' %}
+              <span class="badge bg-primary">Seated</span>
+            {% elif r.status == 'no_show' %}
+              <span class="badge bg-danger">No-Show</span>
+            {% elif r.status == 'cancelled' %}
+              <span class="badge bg-secondary">Cancelled</span>
+            {% else %}
+              <span class="badge bg-info">{{ r.status|capitalize }}</span>
+            {% endif %}
+          </td>
+          <td>
+            <div class="dropdown">
+              <button class="btn btn-sm btn-outline-light dropdown-toggle" type="button" data-bs-toggle="dropdown">Actions</button>
+              <ul class="dropdown-menu dropdown-menu-dark">
+                <li>
+                  <form method="POST" action="/portal/reservation/{{ r.id }}/status">
+                    <input type="hidden" name="status" value="seated">
+                    <button type="submit" class="dropdown-item">Mark Seated</button>
+                  </form>
+                </li>
+                <li>
+                  <form method="POST" action="/portal/reservation/{{ r.id }}/status">
+                    <input type="hidden" name="status" value="no_show">
+                    <button type="submit" class="dropdown-item">Mark No-Show</button>
+                  </form>
+                </li>
+                <li>
+                  <form method="POST" action="/portal/reservation/{{ r.id }}/status">
+                    <input type="hidden" name="status" value="completed">
+                    <button type="submit" class="dropdown-item">Mark Completed</button>
+                  </form>
+                </li>
+              </ul>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="6" class="text-center text-muted">No reservations today</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-md-3">
+    <a href="/portal/restaurant/edit" class="btn btn-accent w-100">Edit Restaurant</a>
+  </div>
+  <div class="col-md-3">
+    <a href="/portal/tables" class="btn btn-outline-light w-100">Manage Tables</a>
+  </div>
+  <div class="col-md-3">
+    <a href="/portal/reservations" class="btn btn-outline-light w-100">View Reservations</a>
+  </div>
+  <div class="col-md-3">
+    <a href="/portal/no-show-stats" class="btn btn-outline-light w-100">No-Show Stats</a>
+  </div>
+</div>
+{% endblock %}
