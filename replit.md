@@ -9,10 +9,36 @@ ReserveEZ (Reserve Table Easy) is a multi-restaurant reservation platform by Err
 Preferred communication style: Simple, everyday language.
 Branding: "ReserveEZ" (Reserve Table Easy), an Errand Easy company. All rights reserved.
 
+## Project Structure
+
+```
+├── main.py              # App factory, blueprint registration, startup
+├── config.py            # Configuration, Stripe/Resend initialization, constants
+├── models.py            # All SQLAlchemy models (db instance)
+├── helpers.py           # Utility functions (as_money, make_slug, etc.)
+├── email_service.py     # Email sending functions (Resend)
+├── routes/
+│   ├── __init__.py
+│   ├── public.py        # Public Blueprint: homepage, booking, payments, cron
+│   ├── portal.py        # Portal Blueprint: restaurant owner dashboard & management
+│   └── admin.py         # Admin Blueprint: system administration
+├── templates/
+│   ├── base.html        # Shared layout
+│   ├── index.html, restaurant.html, reserve.html, ...  # Public templates
+│   ├── portal/          # Restaurant portal templates
+│   ├── admin/           # Admin panel templates
+│   └── emails/          # Email templates
+└── static/              # Static assets
+```
+
 ## System Architecture
 
 ### Backend Framework
-- **Flask** web application with SQLAlchemy ORM
+- **Flask** web application with SQLAlchemy ORM and **Flask Blueprints**
+- **3 separate interfaces** sharing one database:
+  - **Public** (`/`) - Customer-facing restaurant browsing & booking
+  - **Restaurant Portal** (`/portal`) - Restaurant owner management
+  - **Admin Panel** (`/admin`) - System administration
 - **PostgreSQL** database (Neon-backed via Replit)
 - **Environment-based configuration** using python-dotenv
 
