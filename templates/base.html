@@ -89,15 +89,49 @@
     </button>
     <div class="collapse navbar-collapse" id="navMain">
       <ul class="navbar-nav ms-auto">
-        <li class="nav-item">
-          <a class="nav-link" href="/">Home</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="/portal">Restaurant Portal</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="/admin">Admin</a>
-        </li>
+        {% if request.path.startswith('/portal') %}
+          <li class="nav-item">
+            <a class="nav-link" href="/portal">Dashboard</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="/portal/reservations">Reservations</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="/portal/tables">Tables</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="/portal/restaurant/edit">Settings</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="/portal/no-show-stats">No-Shows</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link text-warning" href="/portal/logout">Logout</a>
+          </li>
+        {% elif request.path.startswith('/admin') %}
+          <li class="nav-item">
+            <a class="nav-link" href="/admin">Dashboard</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="/admin/restaurants">Restaurants</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="/admin/promo-codes">Promo Codes</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="/admin/no-show-stats">No-Shows</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="/admin/waitlist">Waitlist</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link text-warning" href="/admin/logout">Logout</a>
+          </li>
+        {% else %}
+          <li class="nav-item">
+            <a class="nav-link" href="/">Home</a>
+          </li>
+        {% endif %}
       </ul>
     </div>
   </div>
