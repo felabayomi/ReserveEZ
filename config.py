@@ -58,7 +58,7 @@ def init_resend():
         resend.api_key = s.get("api_key", "")
         return s.get("from_email", "noreply@reserveez.com")
     resend.api_key = os.getenv("RESEND_API_KEY", "")
-    return os.getenv("SENDER_EMAIL", "noreply@reserveez.com")
+    return os.getenv("SENDER_EMAIL", "noreply@tablepilot.io")
 
 
 STRIPE_PUBLIC_KEY, _stripe_secret = init_stripe()
