@@ -141,6 +141,16 @@ def restaurant_new():
                            restaurant=None, cuisine_types=CUISINE_TYPES)
 
 
+@admin_bp.route("/restaurant/<int:rid>/toggle-visibility", methods=["POST"])
+def toggle_visibility(rid):
+    require_admin()
+    r = Restaurant.query.get_or_404(rid)
+    r.active = not r.active
+    db.session.commit()
+    flash(f"{r.name} is now {'visible' if r.active else 'hidden'} on the public site.", "success")
+    return redirect(url_for("admin.restaurants"))
+
+
 @admin_bp.route("/restaurant/<int:rid>/edit", methods=["GET", "POST"])
 def restaurant_edit(rid):
     require_admin()
