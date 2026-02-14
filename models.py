@@ -229,3 +229,15 @@ class PaymentTransaction(db.Model):
 
     reservation = db.relationship("Reservation", backref="transactions")
     restaurant = db.relationship("Restaurant", backref="transactions")
+
+
+class RestaurantNomination(db.Model):
+    __tablename__ = "restaurant_nomination"
+    id = db.Column(db.Integer, primary_key=True)
+    restaurant_name = db.Column(db.String(200), nullable=False)
+    city = db.Column(db.String(200), nullable=False)
+    restaurant_email = db.Column(db.String(200))
+    nominator_name = db.Column(db.String(200))
+    nominator_email = db.Column(db.String(200))
+    status = db.Column(db.String(30), default="pending")
+    created_at = db.Column(db.DateTime, default=dt.datetime.utcnow)

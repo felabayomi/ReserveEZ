@@ -3,7 +3,7 @@ import json
 from flask import (Blueprint, render_template, request, redirect, url_for, abort,
                    jsonify, flash, make_response)
 import stripe
-from models import db, Restaurant, Table, Reservation, WaitlistEntry, NoShowRecord, PromoCode, PaymentTransaction
+from models import db, Restaurant, Table, Reservation, WaitlistEntry, NoShowRecord, PromoCode, PaymentTransaction, RestaurantNomination
 from config import STRIPE_PUBLIC_KEY, STRIPE_WEBHOOK_SECRET, CUISINE_TYPES, BASE_URL
 from helpers import (as_money, generate_time_slots, get_day_key, find_available_tables,
                      get_no_show_count, calculate_end_time, notify_waitlist_for_slot, make_slug)
@@ -23,9 +23,10 @@ def index():
     cuisine_filter = request.args.get("cuisine", "")
     if cuisine_filter:
         restaurants = [r for r in restaurants if r.cuisine_type == cuisine_filter]
+    nomination_count = RestaurantNomination.query.count()
     return render_template("index.html", restaurants=restaurants,
                            cuisine_types=CUISINE_TYPES, cuisine_filter=cuisine_filter,
-                           as_money=as_money)
+                           as_money=as_money, nomination_count=nomination_count)
 
 
 @public_bp.route("/restaurant/<slug>")
@@ -677,6 +678,29 @@ def terms():
 @public_bp.route("/data-policy")
 def data_policy():
     return render_template("data_policy.html")
+
+
+@public_bp.route("/nominate", methods=["GET", "POST"])
+def nominate():
+    if request.method == "POST":
+        restaurant_name = request.form.get("restaurant_name", "").strip()
+        city = request.form.get("city", "").strip()
+        if not restaurant_name or not city:
+            flash("Restaurant name and city are required.", "error")
+            return redirect(url_for("public.nominate"))
+        nom = RestaurantNomination(
+            restaurant_name=restaurant_name,
+            city=city,
+            restaurant_email=request.form.get("restaurant_email", "").strip() or None,
+            nominator_name=request.form.get("nominator_name", "").strip() or None,
+            nominator_email=request.form.get("nominator_email", "").strip() or None,
+        )
+        db.session.add(nom)
+        db.session.commit()
+        flash("Thank you! Your nomination has been submitted. We'll reach out to them.", "success")
+        return redirect(url_for("public.nominate"))
+    nomination_count = RestaurantNomination.query.count()
+    return render_template("nominate.html", nomination_count=nomination_count)
 
 
 @public_bp.route("/api/availability", methods=["POST"])

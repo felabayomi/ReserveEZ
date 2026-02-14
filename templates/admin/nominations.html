@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block title %}Nominations - Admin{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h3 style="color: var(--tg-accent);">Restaurant Nominations</h3>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-3">
+    <div class="card p-3 text-center">
+      <div class="fs-3 fw-bold" style="color: var(--tg-accent);">{{ counts.total }}</div>
+      <small class="text-muted">Total Nominations</small>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card p-3 text-center">
+      <div class="fs-3 fw-bold text-warning">{{ counts.pending }}</div>
+      <small class="text-muted">Pending</small>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card p-3 text-center">
+      <div class="fs-3 fw-bold text-info">{{ counts.contacted }}</div>
+      <small class="text-muted">Contacted</small>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card p-3 text-center">
+      <div class="fs-3 fw-bold text-success">{{ counts.joined }}</div>
+      <small class="text-muted">Joined</small>
+    </div>
+  </div>
+</div>
+
+<div class="mb-3">
+  <div class="btn-group btn-group-sm">
+    <a href="/admin/nominations" class="btn btn-{% if status_filter == 'all' %}accent{% else %}outline-light{% endif %}">All</a>
+    <a href="/admin/nominations?status=pending" class="btn btn-{% if status_filter == 'pending' %}accent{% else %}outline-light{% endif %}">Pending</a>
+    <a href="/admin/nominations?status=contacted" class="btn btn-{% if status_filter == 'contacted' %}accent{% else %}outline-light{% endif %}">Contacted</a>
+    <a href="/admin/nominations?status=joined" class="btn btn-{% if status_filter == 'joined' %}accent{% else %}outline-light{% endif %}">Joined</a>
+    <a href="/admin/nominations?status=dismissed" class="btn btn-{% if status_filter == 'dismissed' %}accent{% else %}outline-light{% endif %}">Dismissed</a>
+  </div>
+</div>
+
+{% if nominations %}
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-dark table-hover mb-0">
+      <thead>
+        <tr>
+          <th>Restaurant</th>
+          <th>City</th>
+          <th>Restaurant Email</th>
+          <th>Nominated By</th>
+          <th>Date</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for nom in nominations %}
+        <tr>
+          <td class="fw-semibold">{{ nom.restaurant_name }}</td>
+          <td>{{ nom.city }}</td>
+          <td>
+            {% if nom.restaurant_email %}
+              <a href="mailto:{{ nom.restaurant_email }}" class="text-decoration-none">{{ nom.restaurant_email }}</a>
+            {% else %}
+              <span class="text-muted">-</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if nom.nominator_name %}{{ nom.nominator_name }}{% endif %}
+            {% if nom.nominator_email %}<br><small class="text-muted">{{ nom.nominator_email }}</small>{% endif %}
+            {% if not nom.nominator_name and not nom.nominator_email %}<span class="text-muted">Anonymous</span>{% endif %}
+          </td>
+          <td><small>{{ nom.created_at.strftime('%b %d, %Y') }}</small></td>
+          <td>
+            {% if nom.status == 'pending' %}
+              <span class="badge bg-warning text-dark">Pending</span>
+            {% elif nom.status == 'contacted' %}
+              <span class="badge bg-info text-dark">Contacted</span>
+            {% elif nom.status == 'joined' %}
+              <span class="badge bg-success">Joined</span>
+            {% elif nom.status == 'dismissed' %}
+              <span class="badge bg-secondary">Dismissed</span>
+            {% endif %}
+          </td>
+          <td>
+            <div class="dropdown">
+              <button class="btn btn-sm btn-outline-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                Update
+              </button>
+              <ul class="dropdown-menu dropdown-menu-dark">
+                {% for s, label in [('pending', 'Pending'), ('contacted', 'Contacted'), ('joined', 'Joined'), ('dismissed', 'Dismissed')] %}
+                  {% if nom.status != s %}
+                  <li>
+                    <form method="POST" action="/admin/nomination/{{ nom.id }}/status" class="d-inline">
+                      <input type="hidden" name="status" value="{{ s }}">
+                      <button type="submit" class="dropdown-item">Mark {{ label }}</button>
+                    </form>
+                  </li>
+                  {% endif %}
+                {% endfor %}
+              </ul>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="text-center py-5">
+  <h5 class="text-light opacity-75">No nominations found</h5>
+  <p class="text-muted">{% if status_filter != 'all' %}No nominations with status "{{ status_filter }}". <a href="/admin/nominations">View all</a>{% else %}Nominations from customers will appear here.{% endif %}</p>
+</div>
+{% endif %}
+{% endblock %}

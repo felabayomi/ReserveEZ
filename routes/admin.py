@@ -3,7 +3,7 @@ import json
 from flask import (Blueprint, render_template, request, redirect, url_for, abort,
                    flash, session)
 import stripe
-from models import db, Restaurant, Table, Reservation, WaitlistEntry, NoShowRecord, PromoCode, RestaurantUser, PaymentTransaction
+from models import db, Restaurant, Table, Reservation, WaitlistEntry, NoShowRecord, PromoCode, RestaurantUser, PaymentTransaction, RestaurantNomination
 from config import ADMIN_PASSWORD, CUISINE_TYPES
 from helpers import as_money, make_slug, notify_waitlist_for_slot
 from email_service import send_no_show_email
@@ -470,3 +470,32 @@ def finances():
                            pending_count=pending_count,
                            not_connected_count=not_connected_count,
                            days=days, as_money=as_money)
+
+
+@admin_bp.route("/nominations")
+def nominations():
+    require_admin()
+    status_filter = request.args.get("status", "all")
+    query = RestaurantNomination.query
+    if status_filter != "all":
+        query = query.filter_by(status=status_filter)
+    noms = query.order_by(RestaurantNomination.created_at.desc()).all()
+    counts = {
+        "total": RestaurantNomination.query.count(),
+        "pending": RestaurantNomination.query.filter_by(status="pending").count(),
+        "contacted": RestaurantNomination.query.filter_by(status="contacted").count(),
+        "joined": RestaurantNomination.query.filter_by(status="joined").count(),
+    }
+    return render_template("admin/nominations.html", nominations=noms, status_filter=status_filter, counts=counts)
+
+
+@admin_bp.route("/nomination/<int:nid>/status", methods=["POST"])
+def nomination_status(nid):
+    require_admin()
+    nom = RestaurantNomination.query.get_or_404(nid)
+    new_status = request.form.get("status")
+    if new_status in ("pending", "contacted", "joined", "dismissed"):
+        nom.status = new_status
+        db.session.commit()
+        flash(f"Nomination for '{nom.restaurant_name}' marked as {new_status}.", "success")
+    return redirect(url_for("admin.nominations"))
