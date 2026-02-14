@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>New Reservation</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f4f4f4;font-family:Arial,Helvetica,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f4;padding:20px 0;">
+<tr>
+<td align="center">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+
+<tr>
+<td style="background-color:#e94560;padding:30px 40px;text-align:center;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+<tr>
+<td style="color:#ffffff;font-size:28px;font-weight:bold;letter-spacing:1px;">ReserveEZ</td>
+</tr>
+<tr>
+<td style="color:rgba(255,255,255,0.85);font-size:13px;padding-top:4px;">Restaurant Reservations</td>
+</tr>
+</table>
+</td>
+</tr>
+
+<tr>
+<td style="padding:40px 40px 10px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+<tr>
+<td style="text-align:center;">
+<div style="font-size:48px;line-height:1;">&#127869;</div>
+<h1 style="margin:10px 0 5px;font-size:24px;color:#1a1a2e;">New Reservation</h1>
+<p style="margin:0 0 20px;color:#555555;font-size:14px;">A new reservation has been made at {{ r.restaurant.name }}.</p>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+
+<tr>
+<td style="padding:0 40px 20px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f9f9f9;border-radius:6px;border:1px solid #eeeeee;">
+<tr>
+<td style="padding:20px 24px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+<tr>
+<td style="padding:8px 0;color:#888888;font-size:12px;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #eeeeee;" colspan="2">Reservation Details</td>
+</tr>
+<tr>
+<td style="padding:12px 0 8px;color:#555555;font-size:14px;width:140px;">Guest Name</td>
+<td style="padding:12px 0 8px;color:#1a1a2e;font-size:14px;font-weight:bold;">{{ r.guest_name }}</td>
+</tr>
+<tr>
+<td style="padding:8px 0;color:#555555;font-size:14px;">Date</td>
+<td style="padding:8px 0;color:#1a1a2e;font-size:14px;font-weight:bold;">{{ r.reservation_date.strftime('%A, %B %-d, %Y') }}</td>
+</tr>
+<tr>
+<td style="padding:8px 0;color:#555555;font-size:14px;">Time</td>
+<td style="padding:8px 0;color:#1a1a2e;font-size:14px;font-weight:bold;">{{ r.reservation_time.strftime('%-I:%M %p') }}</td>
+</tr>
+<tr>
+<td style="padding:8px 0;color:#555555;font-size:14px;">Party Size</td>
+<td style="padding:8px 0;color:#1a1a2e;font-size:14px;font-weight:bold;">{{ r.party_size }} {{ 'guest' if r.party_size == 1 else 'guests' }}</td>
+</tr>
+{% if r.table %}
+<tr>
+<td style="padding:8px 0;color:#555555;font-size:14px;">Table</td>
+<td style="padding:8px 0;color:#1a1a2e;font-size:14px;font-weight:bold;">{{ r.table.name }}</td>
+</tr>
+{% endif %}
+<tr>
+<td style="padding:8px 0;color:#555555;font-size:14px;">Confirmation Code</td>
+<td style="padding:8px 0;color:#1a1a2e;font-size:14px;font-weight:bold;letter-spacing:2px;">{{ r.uuid[:8]|upper }}</td>
+</tr>
+</table>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+
+{% if r.deposit_paid and r.deposit_amount_cents > 0 %}
+<tr>
+<td style="padding:0 40px 20px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#eafaf1;border-radius:6px;border:1px solid #d4edda;">
+<tr>
+<td style="padding:14px 20px;color:#2d6a4f;font-size:14px;">
+<strong>Deposit Paid:</strong> {{ as_money(r.deposit_amount_cents) }}
+</td>
+</tr>
+</table>
+</td>
+</tr>
+{% elif r.deposit_amount_cents > 0 %}
+<tr>
+<td style="padding:0 40px 20px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#fff8e1;border-radius:6px;border:1px solid #ffecb3;">
+<tr>
+<td style="padding:14px 20px;color:#6d4c00;font-size:14px;">
+<strong>Deposit Pending:</strong> {{ as_money(r.deposit_amount_cents) }}
+</td>
+</tr>
+</table>
+</td>
+</tr>
+{% else %}
+<tr>
+<td style="padding:0 40px 20px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f9f9f9;border-radius:6px;border:1px solid #eeeeee;">
+<tr>
+<td style="padding:14px 20px;color:#555555;font-size:14px;">
+<strong>Deposit:</strong> No deposit required
+</td>
+</tr>
+</table>
+</td>
+</tr>
+{% endif %}
+
+<tr>
+<td style="padding:10px 40px 30px;text-align:center;">
+<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto;">
+<tr>
+<td style="padding:0 8px;">
+<a href="{{ portal_url }}" style="display:inline-block;background-color:#e94560;color:#ffffff;text-decoration:none;padding:14px 28px;border-radius:6px;font-size:14px;font-weight:bold;">View Reservations</a>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+
+<tr>
+<td style="background-color:#f4f4f4;padding:24px 40px;text-align:center;border-top:1px solid #eeeeee;">
+<p style="margin:0 0 8px;color:#999999;font-size:12px;">This email was sent by ReserveEZ (an Errand Easy company) for {{ r.restaurant.name }}.</p>
+<p style="margin:0;color:#bbbbbb;font-size:11px;">You are receiving this because you are registered as the restaurant contact.</p>
+</td>
+</tr>
+
+</table>
+</td>
+</tr>
+</table>
+</body>
+</html>

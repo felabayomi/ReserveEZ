@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>New Restaurant Registration</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f4f4f4;font-family:Arial,Helvetica,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f4;padding:20px 0;">
+<tr>
+<td align="center">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+
+<tr>
+<td style="background-color:#e94560;padding:30px 40px;text-align:center;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+<tr>
+<td style="color:#ffffff;font-size:28px;font-weight:bold;letter-spacing:1px;">ReserveEZ</td>
+</tr>
+<tr>
+<td style="color:rgba(255,255,255,0.85);font-size:13px;padding-top:4px;">Admin Notification</td>
+</tr>
+</table>
+</td>
+</tr>
+
+<tr>
+<td style="padding:40px 40px 10px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+<tr>
+<td style="text-align:center;">
+<div style="font-size:48px;line-height:1;">&#127974;</div>
+<h1 style="margin:10px 0 5px;font-size:24px;color:#1a1a2e;">New Restaurant Registration</h1>
+<p style="margin:0 0 20px;color:#555555;font-size:14px;">A new restaurant has registered and is awaiting approval.</p>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+
+<tr>
+<td style="padding:0 40px 20px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f9f9f9;border-radius:6px;border:1px solid #eeeeee;">
+<tr>
+<td style="padding:20px 24px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+<tr>
+<td style="padding:8px 0;color:#888888;font-size:12px;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #eeeeee;" colspan="2">Owner Details</td>
+</tr>
+<tr>
+<td style="padding:12px 0 8px;color:#555555;font-size:14px;width:140px;">Owner Name</td>
+<td style="padding:12px 0 8px;color:#1a1a2e;font-size:14px;font-weight:bold;">{{ user.name }}</td>
+</tr>
+<tr>
+<td style="padding:8px 0;color:#555555;font-size:14px;">Email</td>
+<td style="padding:8px 0;color:#1a1a2e;font-size:14px;font-weight:bold;">{{ user.email }}</td>
+</tr>
+{% if user.phone %}
+<tr>
+<td style="padding:8px 0;color:#555555;font-size:14px;">Phone</td>
+<td style="padding:8px 0;color:#1a1a2e;font-size:14px;font-weight:bold;">{{ user.phone }}</td>
+</tr>
+{% endif %}
+</table>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+
+<tr>
+<td style="padding:0 40px 20px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f9f9f9;border-radius:6px;border:1px solid #eeeeee;">
+<tr>
+<td style="padding:20px 24px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+<tr>
+<td style="padding:8px 0;color:#888888;font-size:12px;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #eeeeee;" colspan="2">Restaurant Details</td>
+</tr>
+<tr>
+<td style="padding:12px 0 8px;color:#555555;font-size:14px;width:140px;">Restaurant Name</td>
+<td style="padding:12px 0 8px;color:#1a1a2e;font-size:14px;font-weight:bold;">{{ user.restaurant.name }}</td>
+</tr>
+{% if user.restaurant.cuisine_type %}
+<tr>
+<td style="padding:8px 0;color:#555555;font-size:14px;">Cuisine</td>
+<td style="padding:8px 0;color:#1a1a2e;font-size:14px;font-weight:bold;">{{ user.restaurant.cuisine_type }}</td>
+</tr>
+{% endif %}
+{% if user.restaurant.address %}
+<tr>
+<td style="padding:8px 0;color:#555555;font-size:14px;">Address</td>
+<td style="padding:8px 0;color:#1a1a2e;font-size:14px;font-weight:bold;">{{ user.restaurant.address }}</td>
+</tr>
+{% endif %}
+{% if user.restaurant.phone %}
+<tr>
+<td style="padding:8px 0;color:#555555;font-size:14px;">Restaurant Phone</td>
+<td style="padding:8px 0;color:#1a1a2e;font-size:14px;font-weight:bold;">{{ user.restaurant.phone }}</td>
+</tr>
+{% endif %}
+{% if user.restaurant.email %}
+<tr>
+<td style="padding:8px 0;color:#555555;font-size:14px;">Restaurant Email</td>
+<td style="padding:8px 0;color:#1a1a2e;font-size:14px;font-weight:bold;">{{ user.restaurant.email }}</td>
+</tr>
+{% endif %}
+</table>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+
+<tr>
+<td style="padding:10px 40px 30px;text-align:center;">
+<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto;">
+<tr>
+<td style="padding:0 8px;">
+<a href="{{ admin_url }}" style="display:inline-block;background-color:#e94560;color:#ffffff;text-decoration:none;padding:14px 28px;border-radius:6px;font-size:14px;font-weight:bold;">Review &amp; Approve</a>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+
+<tr>
+<td style="background-color:#f4f4f4;padding:24px 40px;text-align:center;border-top:1px solid #eeeeee;">
+<p style="margin:0 0 8px;color:#999999;font-size:12px;">This email was sent by ReserveEZ (an Errand Easy company).</p>
+<p style="margin:0;color:#bbbbbb;font-size:11px;">You are receiving this because you are the platform administrator.</p>
+</td>
+</tr>
+
+</table>
+</td>
+</tr>
+</table>
+</body>
+</html>

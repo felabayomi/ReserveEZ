@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stripe Connected</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f4f4f4;font-family:Arial,Helvetica,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f4;padding:20px 0;">
+<tr>
+<td align="center">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+
+<tr>
+<td style="background-color:#e94560;padding:30px 40px;text-align:center;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+<tr>
+<td style="color:#ffffff;font-size:28px;font-weight:bold;letter-spacing:1px;">ReserveEZ</td>
+</tr>
+<tr>
+<td style="color:rgba(255,255,255,0.85);font-size:13px;padding-top:4px;">Restaurant Reservations</td>
+</tr>
+</table>
+</td>
+</tr>
+
+<tr>
+<td style="padding:40px 40px 10px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+<tr>
+<td style="text-align:center;">
+<div style="font-size:48px;line-height:1;">&#10003;</div>
+<h1 style="margin:10px 0 5px;font-size:24px;color:#1a1a2e;">Stripe Connected Successfully!</h1>
+<p style="margin:0 0 20px;color:#555555;font-size:14px;">Your Stripe account for {{ restaurant.name }} is now active.</p>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+
+<tr>
+<td style="padding:0 40px 20px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#eafaf1;border-radius:6px;border:1px solid #d4edda;">
+<tr>
+<td style="padding:20px 24px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+<tr>
+<td style="padding:8px 0;color:#2d6a4f;font-size:12px;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #d4edda;" colspan="2">Account Status</td>
+</tr>
+<tr>
+<td style="padding:12px 0 8px;color:#555555;font-size:14px;width:160px;">Charges Enabled</td>
+<td style="padding:12px 0 8px;color:#2d6a4f;font-size:14px;font-weight:bold;">&#10003; Active</td>
+</tr>
+<tr>
+<td style="padding:8px 0;color:#555555;font-size:14px;">Payouts Enabled</td>
+<td style="padding:8px 0;color:#2d6a4f;font-size:14px;font-weight:bold;">{% if restaurant.stripe_payouts_enabled %}&#10003; Active{% else %}Pending{% endif %}</td>
+</tr>
+</table>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+
+<tr>
+<td style="padding:0 40px 20px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f9f9f9;border-radius:6px;border:1px solid #eeeeee;">
+<tr>
+<td style="padding:14px 20px;color:#555555;font-size:13px;">
+<strong>What you can now do:</strong>
+<ul style="margin:8px 0 0;padding-left:20px;line-height:1.8;">
+<li>Receive deposit payments directly to your account</li>
+<li>Collect no-show and late cancellation fees</li>
+<li>View earnings and payout history on your dashboard</li>
+</ul>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+
+<tr>
+<td style="padding:10px 40px 30px;text-align:center;">
+<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto;">
+<tr>
+<td style="padding:0 8px;">
+<a href="{{ earnings_url }}" style="display:inline-block;background-color:#e94560;color:#ffffff;text-decoration:none;padding:14px 28px;border-radius:6px;font-size:14px;font-weight:bold;">View Earnings Dashboard</a>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+
+<tr>
+<td style="background-color:#f4f4f4;padding:24px 40px;text-align:center;border-top:1px solid #eeeeee;">
+<p style="margin:0 0 8px;color:#999999;font-size:12px;">This email was sent by ReserveEZ (an Errand Easy company) for {{ restaurant.name }}.</p>
+<p style="margin:0;color:#bbbbbb;font-size:11px;">You are receiving this because you are registered as the restaurant owner.</p>
+</td>
+</tr>
+
+</table>
+</td>
+</tr>
+</table>
+</body>
+</html>

@@ -1,0 +1,183 @@
+RESERVEEZ – COMPREHENSIVE NOTIFICATION STRUCTURE
+1️⃣ GUEST NOTIFICATIONS
+Reservation Events
+Reservation confirmation (immediate)
+
+Reservation modification confirmation
+
+Reservation cancellation confirmation
+
+Waitlist confirmation
+
+Waitlist converted to confirmed reservation
+
+Reminder Notifications
+24-hour reminder
+
+2–3 hour reminder
+
+Same-day reminder (optional toggle)
+
+Deposit & Payment Notifications
+Deposit charged successfully
+
+Deposit refunded
+
+Deposit forfeited (no-show)
+
+Payment failed
+
+Payment retry successful
+
+Policy & Deadline Alerts
+Cancellation deadline approaching
+
+Deposit required to confirm booking
+
+Reservation auto-canceled (no confirmation)
+
+2️⃣ RESTAURANT NOTIFICATIONS
+Reservation Activity
+New reservation received
+
+Reservation modified
+
+Reservation canceled
+
+Large party booking alert
+
+Waitlist booking created
+
+Waitlist converted to confirmed
+
+No-show recorded
+
+Capacity & Booking Alerts
+Fully booked time slot
+
+Near-capacity alert (e.g., 90% full)
+
+Overbooking warning
+
+Payment & Stripe Notifications
+Deposit received
+
+Deposit refunded
+
+Deposit retained (no-show)
+
+Payment failed
+
+Stripe connected successfully
+
+Stripe connection failed
+
+Stripe disconnected
+
+Bank payout sent
+
+Performance Summaries (Optional)
+Daily reservation summary
+
+Weekly reservation summary
+
+No-show rate summary
+
+Deposit totals summary
+
+3️⃣ ADMIN NOTIFICATIONS (Platform Owner)
+Restaurant Activity
+New restaurant registration submitted
+
+Restaurant approved
+
+Restaurant rejected
+
+Restaurant profile incomplete
+
+Restaurant inactive for X days
+
+Restaurant deleted
+
+Payment & Risk Alerts
+Deposit payment failed
+
+High refund activity detected
+
+Chargeback/dispute initiated
+
+Unusual transaction activity
+
+Repeated failed payments (same user)
+
+Fraud & Abuse Monitoring
+Multiple no-shows from same guest
+
+Sudden spike in cancellations
+
+Suspicious booking activity
+
+Reservation volume spike
+
+Platform Performance Alerts
+Total reservations today
+
+Daily booking volume drop
+
+Weekly booking summary
+
+Revenue summary (if applicable)
+
+Top-performing restaurants
+
+Technical & System Health
+Email delivery failure rate high
+
+SMS delivery failure
+
+Server downtime detected
+
+API error spike
+
+Database backup completed
+
+Database backup failed
+
+Support & Communication
+New support ticket submitted
+
+Restaurant complaint submitted
+
+Guest complaint submitted
+
+Feature request submitted
+
+Report/flag submitted
+
+MVP PRIORITY NOTIFICATIONS (Minimum Required to Launch)
+Guest
+Reservation confirmation
+
+24-hour reminder
+
+Cancellation confirmation
+
+Restaurant
+New reservation
+
+Cancellation
+
+Deposit status
+
+Stripe connection status
+
+Admin
+New restaurant registration
+
+Failed deposit payments
+
+Chargebacks/disputes
+
+Support ticket submitted
+
+System downtime alert

@@ -6,7 +6,7 @@ import stripe
 from models import db, Restaurant, Table, Reservation, NoShowRecord, WaitlistEntry, RestaurantUser
 from config import CUISINE_TYPES, BASE_URL
 from helpers import as_money, make_slug
-from email_service import send_no_show_email
+from email_service import send_no_show_email, send_admin_new_registration, send_restaurant_stripe_connected, send_restaurant_no_show
 from models import PaymentTransaction
 
 portal_bp = Blueprint("portal", __name__)
@@ -89,6 +89,12 @@ def register():
         db.session.commit()
 
         session["portal_user_id"] = user.id
+
+        try:
+            send_admin_new_registration(user)
+        except Exception as e:
+            print(f"Admin registration notification error: {e}")
+
         flash("Your restaurant has been submitted for review. You can start setting up your details while you wait for approval.", "success")
         return redirect(url_for("portal.dashboard"))
 
@@ -327,6 +333,10 @@ def reservation_status(res_id):
                     print(f"[NO-SHOW FEE ERROR] {e}")
             db.session.add(record)
             send_no_show_email(r, r.restaurant.no_show_fee_cents)
+            try:
+                send_restaurant_no_show(r, r.restaurant.no_show_fee_cents)
+            except Exception as e:
+                print(f"Restaurant no-show notification error: {e}")
         db.session.commit()
         flash(f"Reservation marked as {new_status}.", "success")
     return redirect(url_for("portal.reservations"))
@@ -413,6 +423,12 @@ def connect_stripe_complete():
         if account.charges_enabled:
             restaurant.stripe_connect_status = "active"
         db.session.commit()
+
+    if restaurant.stripe_charges_enabled:
+        try:
+            send_restaurant_stripe_connected(restaurant)
+        except Exception as e:
+            print(f"Stripe connected notification error: {e}")
 
     flash("Stripe account connected successfully!" if restaurant.stripe_charges_enabled else "Please complete your Stripe setup.", "success" if restaurant.stripe_charges_enabled else "warning")
     return redirect(url_for("portal.dashboard"))

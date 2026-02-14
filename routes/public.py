@@ -8,7 +8,11 @@ from config import STRIPE_PUBLIC_KEY, STRIPE_WEBHOOK_SECRET, CUISINE_TYPES, BASE
 from helpers import (as_money, generate_time_slots, get_day_key, find_available_tables,
                      get_no_show_count, calculate_end_time, notify_waitlist_for_slot, make_slug)
 from email_service import (send_confirmation_email, send_reminder_email,
-                           send_cancellation_email, send_no_show_email)
+                           send_cancellation_email, send_no_show_email,
+                           send_restaurant_new_reservation, send_deposit_receipt,
+                           send_restaurant_cancellation, send_deposit_refund_email,
+                           send_restaurant_no_show, send_admin_deposit_failed,
+                           send_restaurant_deposit_received)
 
 public_bp = Blueprint("public", __name__)
 
@@ -229,6 +233,10 @@ def reserve(slug):
                 )
                 db.session.add(txn)
             except stripe.StripeError as e:
+                try:
+                    send_admin_deposit_failed(reservation, str(e))
+                except Exception as notify_err:
+                    print(f"Admin deposit failed notification error: {notify_err}")
                 flash(f"Payment failed: {str(e)}", "error")
                 return redirect(url_for("public.reserve", slug=slug, date=date_str,
                                         time=time_str, party_size=party_size))
@@ -242,6 +250,21 @@ def reserve(slug):
             send_confirmation_email(reservation)
         except Exception as e:
             print(f"Email error: {e}")
+
+        try:
+            send_restaurant_new_reservation(reservation)
+        except Exception as e:
+            print(f"Restaurant notification error: {e}")
+
+        if reservation.deposit_paid and reservation.deposit_amount_cents > 0:
+            try:
+                send_deposit_receipt(reservation)
+            except Exception as e:
+                print(f"Deposit receipt error: {e}")
+            try:
+                send_restaurant_deposit_received(reservation, reservation.deposit_amount_cents)
+            except Exception as e:
+                print(f"Restaurant deposit notification error: {e}")
 
         return redirect(url_for("public.confirmation", res_uuid=reservation.uuid))
 
@@ -319,6 +342,17 @@ def cancel_reservation(res_uuid, token):
         send_cancellation_email(reservation, fee_charged, fee_amount)
     except Exception as e:
         print(f"Email error: {e}")
+
+    try:
+        send_restaurant_cancellation(reservation)
+    except Exception as e:
+        print(f"Restaurant cancellation notification error: {e}")
+
+    if reservation.can_cancel_free and reservation.deposit_paid and reservation.deposit_amount_cents > 0:
+        try:
+            send_deposit_refund_email(reservation, reservation.deposit_amount_cents)
+        except Exception as e:
+            print(f"Deposit refund email error: {e}")
 
     flash("Your reservation has been cancelled.", "success")
     return redirect(url_for("public.manage_reservation", res_uuid=res_uuid, token=token))
@@ -584,6 +618,11 @@ def cron_process_no_shows():
 
             try:
                 send_no_show_email(r, fee_amount)
+            except:
+                pass
+
+            try:
+                send_restaurant_no_show(r, fee_amount)
             except:
                 pass
 
