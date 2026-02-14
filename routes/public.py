@@ -649,6 +649,36 @@ def cron_expire_waitlist():
     return jsonify({"expired": len(expired) + len(past)})
 
 
+@public_bp.route("/about")
+def about():
+    return render_template("about.html")
+
+
+@public_bp.route("/how-it-works/guests")
+def how_it_works_guests():
+    return render_template("how_it_works_guests.html")
+
+
+@public_bp.route("/how-it-works/restaurants")
+def how_it_works_restaurants():
+    return render_template("how_it_works_restaurants.html")
+
+
+@public_bp.route("/privacy")
+def privacy():
+    return render_template("privacy.html")
+
+
+@public_bp.route("/terms")
+def terms():
+    return render_template("terms.html")
+
+
+@public_bp.route("/data-policy")
+def data_policy():
+    return render_template("data_policy.html")
+
+
 @public_bp.route("/api/availability", methods=["POST"])
 def api_availability():
     data = request.get_json()

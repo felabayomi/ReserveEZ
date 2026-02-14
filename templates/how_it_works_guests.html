@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}How It Works for Guests - ReserveEZ{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <h1 style="color: var(--tg-accent);" class="mb-2">How It Works</h1>
+    <p class="text-muted mb-4">For Guests (Customers)</p>
+
+    <div class="card p-4 mb-4">
+      <div class="d-flex align-items-start mb-3">
+        <span class="badge bg-danger rounded-circle me-3 d-flex align-items-center justify-content-center" style="width:40px;height:40px;font-size:1.2rem;flex-shrink:0;">1</span>
+        <div>
+          <h4 class="mb-1">Find a Restaurant</h4>
+          <p class="mb-0 text-muted">Browse participating restaurants in your area. Filter by cuisine type to find exactly what you're craving.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card p-4 mb-4">
+      <div class="d-flex align-items-start mb-3">
+        <span class="badge bg-danger rounded-circle me-3 d-flex align-items-center justify-content-center" style="width:40px;height:40px;font-size:1.2rem;flex-shrink:0;">2</span>
+        <div>
+          <h4 class="mb-1">Select Date & Time</h4>
+          <p class="mb-0 text-muted">Choose your preferred date, time, and party size. See real-time availability so you know exactly what's open.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card p-4 mb-4">
+      <div class="d-flex align-items-start mb-3">
+        <span class="badge bg-danger rounded-circle me-3 d-flex align-items-center justify-content-center" style="width:40px;height:40px;font-size:1.2rem;flex-shrink:0;">3</span>
+        <div>
+          <h4 class="mb-1">Confirm Reservation</h4>
+          <p class="mb-0 text-muted">Some restaurants may require a small deposit to secure your booking. Payments are processed securely through Stripe.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card p-4 mb-4">
+      <div class="d-flex align-items-start mb-3">
+        <span class="badge bg-danger rounded-circle me-3 d-flex align-items-center justify-content-center" style="width:40px;height:40px;font-size:1.2rem;flex-shrink:0;">4</span>
+        <div>
+          <h4 class="mb-1">Receive Confirmation</h4>
+          <p class="mb-0 text-muted">You'll receive an email confirmation with your reservation details, plus reminder notifications before your reservation.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card p-4 mb-4">
+      <div class="d-flex align-items-start mb-3">
+        <span class="badge bg-danger rounded-circle me-3 d-flex align-items-center justify-content-center" style="width:40px;height:40px;font-size:1.2rem;flex-shrink:0;">5</span>
+        <div>
+          <h4 class="mb-1">Arrive & Enjoy</h4>
+          <p class="mb-0 text-muted">Arrive at your scheduled time and enjoy your dining experience. No more long waits!</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card p-4">
+      <h5 style="color: var(--tg-accent);">Need to Cancel or Reschedule?</h5>
+      <p class="mb-0 text-muted">You can manage your reservation using the link in your confirmation email. Cancellation and rescheduling are subject to the restaurant's cancellation policy.</p>
+    </div>
+
+    <div class="text-center mt-4">
+      <a href="/" class="btn btn-accent btn-lg">Browse Restaurants</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

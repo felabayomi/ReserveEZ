@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}How It Works for Restaurants - ReserveEZ{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <h1 style="color: var(--tg-accent);" class="mb-2">How It Works</h1>
+    <p class="text-muted mb-4">For Restaurants</p>
+
+    <div class="card p-4 mb-4">
+      <div class="d-flex align-items-start mb-3">
+        <span class="badge bg-danger rounded-circle me-3 d-flex align-items-center justify-content-center" style="width:40px;height:40px;font-size:1.2rem;flex-shrink:0;">1</span>
+        <div>
+          <h4 class="mb-1">Create an Account</h4>
+          <p class="mb-0 text-muted">Register your restaurant through the ReserveEZ Restaurant Portal. Provide your restaurant details, cuisine type, and contact information.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card p-4 mb-4">
+      <div class="d-flex align-items-start mb-3">
+        <span class="badge bg-danger rounded-circle me-3 d-flex align-items-center justify-content-center" style="width:40px;height:40px;font-size:1.2rem;flex-shrink:0;">2</span>
+        <div>
+          <h4 class="mb-1">Configure Settings</h4>
+          <p class="mb-0 text-muted">Set up your business hours, reservation availability, deposit requirements, and cancellation rules — all customizable to fit your restaurant's needs.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card p-4 mb-4">
+      <div class="d-flex align-items-start mb-3">
+        <span class="badge bg-danger rounded-circle me-3 d-flex align-items-center justify-content-center" style="width:40px;height:40px;font-size:1.2rem;flex-shrink:0;">3</span>
+        <div>
+          <h4 class="mb-1">Add Tables</h4>
+          <p class="mb-0 text-muted">Customize your table layout with table names, seating capacity, and table types (booth, patio, window, counter, private dining, and more).</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card p-4 mb-4">
+      <div class="d-flex align-items-start mb-3">
+        <span class="badge bg-danger rounded-circle me-3 d-flex align-items-center justify-content-center" style="width:40px;height:40px;font-size:1.2rem;flex-shrink:0;">4</span>
+        <div>
+          <h4 class="mb-1">Connect Stripe</h4>
+          <p class="mb-0 text-muted">Securely connect your Stripe account to receive deposits directly into your bank account. Setup takes just a few minutes.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card p-4 mb-4">
+      <div class="d-flex align-items-start mb-3">
+        <span class="badge bg-danger rounded-circle me-3 d-flex align-items-center justify-content-center" style="width:40px;height:40px;font-size:1.2rem;flex-shrink:0;">5</span>
+        <div>
+          <h4 class="mb-1">Start Accepting Reservations</h4>
+          <p class="mb-0 text-muted">Guests can now book online 24/7. You control availability, reservation approvals, policies, and payment requirements.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card p-4">
+      <h5 style="color: var(--tg-accent);">You're in Full Control</h5>
+      <ul class="text-muted mb-0">
+        <li>Set your own deposit amounts and cancellation policies</li>
+        <li>View and manage all reservations from your dashboard</li>
+        <li>Track no-shows and earnings in real time</li>
+        <li>Receive instant email notifications for new bookings and cancellations</li>
+      </ul>
+    </div>
+
+    <div class="text-center mt-4">
+      <a href="/portal/register" class="btn btn-accent btn-lg">Register Your Restaurant</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -161,9 +161,34 @@
 </main>
 
 <footer class="footer-section">
-  <div class="container text-center">
-    <p class="mb-1">&copy; {{ now().year if now is defined else 2026 }} Reserve Table Easy (ReserveEZ). All rights reserved.</p>
-    <small class="text-muted">An Errand Easy Company</small>
+  <div class="container">
+    <div class="row">
+      <div class="col-md-4 mb-3 mb-md-0">
+        <h6 style="color: var(--tg-accent); font-weight: 600;">ReserveEZ</h6>
+        <p class="small text-muted mb-1">Reserve Table Easy</p>
+        <p class="small text-muted mb-0">A product of <strong>Errand Easy</strong></p>
+      </div>
+      <div class="col-md-4 mb-3 mb-md-0">
+        <h6 style="color: #ccc; font-weight: 600;">How It Works</h6>
+        <ul class="list-unstyled small mb-0">
+          <li class="mb-1"><a href="/about" class="text-muted text-decoration-none">About Us</a></li>
+          <li class="mb-1"><a href="/how-it-works/guests" class="text-muted text-decoration-none">For Guests</a></li>
+          <li class="mb-1"><a href="/how-it-works/restaurants" class="text-muted text-decoration-none">For Restaurants</a></li>
+        </ul>
+      </div>
+      <div class="col-md-4">
+        <h6 style="color: #ccc; font-weight: 600;">Legal</h6>
+        <ul class="list-unstyled small mb-0">
+          <li class="mb-1"><a href="/privacy" class="text-muted text-decoration-none">Privacy Policy</a></li>
+          <li class="mb-1"><a href="/terms" class="text-muted text-decoration-none">Terms of Use</a></li>
+          <li class="mb-1"><a href="/data-policy" class="text-muted text-decoration-none">Data Policy</a></li>
+        </ul>
+      </div>
+    </div>
+    <hr style="border-color: rgba(233,69,96,0.2); margin: 1.5rem 0 1rem;">
+    <div class="text-center">
+      <p class="small text-muted mb-0">&copy; {{ now().year if now is defined else 2026 }} Errand Easy. All rights reserved. ReserveEZ (Reserve Table Easy) is a product of Errand Easy.</p>
+    </div>
   </div>
 </footer>
 

@@ -1,0 +1,227 @@
+ABOUT RESERVEEZ
+
+About ReserveEZ
+
+ReserveEZ is a community-focused online reservation platform designed to help restaurants manage bookings efficiently while improving the dining experience for guests.
+
+We created ReserveEZ to solve a common challenge in growing communities: long wait times, overcrowding during peak hours, and the lack of structured reservations for special occasions.
+
+Our mission is simple:
+	•	Help restaurants increase predictable revenue
+	•	Reduce no-shows and operational stress
+	•	Improve guest satisfaction
+	•	Make dining more organized and enjoyable
+
+ReserveEZ provides a secure, easy-to-use system that allows guests to reserve tables online while giving restaurants full control over availability, deposits, and table management.
+
+We believe technology should simplify operations — not complicate them.
+
+⸻
+
+HOW TO USE RESERVEEZ
+
+For Guests (Customers)
+
+1. Find a Restaurant
+
+Browse participating restaurants in your area.
+
+2. Select Date & Time
+
+Choose your preferred date, time, and party size.
+
+3. Confirm Reservation
+
+Some restaurants may require a small deposit to secure your booking.
+
+4. Receive Confirmation
+
+You’ll receive:
+	•	Email confirmation
+	•	Reminder notifications before your reservation
+
+5. Arrive & Enjoy
+
+Arrive at your scheduled time and enjoy your dining experience.
+
+If you need to cancel or reschedule, you can do so according to the restaurant’s cancellation policy.
+
+⸻
+
+For Restaurants
+
+1. Create an Account
+
+Register your restaurant through the ReserveEZ Restaurant Portal.
+
+2. Configure Settings
+
+Set:
+	•	Business hours
+	•	Reservation availability
+	•	Deposit requirements
+	•	Cancellation rules
+
+3. Add Tables
+
+Customize your layout:
+	•	Table names
+	•	Seating capacity
+	•	Table types (booth, patio, etc.)
+
+4. Connect Stripe
+
+Securely connect your Stripe account to receive deposits directly into your bank account.
+
+5. Start Accepting Reservations
+
+Guests can now book online 24/7.
+
+You control:
+	•	Availability
+	•	Reservation approvals
+	•	Policies
+	•	Payment requirements
+
+⸻
+
+PRIVACY POLICY
+
+Effective Date: [Insert Date]
+
+ReserveEZ respects your privacy and is committed to protecting your personal information.
+
+Information We Collect
+
+For Guests:
+	•	Name
+	•	Email address
+	•	Phone number
+	•	Reservation details
+	•	Payment information (processed securely via Stripe)
+
+For Restaurants:
+	•	Business name
+	•	Contact information
+	•	Business address
+	•	Stripe connection information
+
+How We Use Information
+
+We use your information to:
+	•	Process reservations
+	•	Send confirmations and reminders
+	•	Improve platform functionality
+	•	Communicate important updates
+	•	Prevent fraud or abuse
+
+Payment Processing
+
+All payment transactions are processed securely through Stripe. ReserveEZ does not store full credit card details.
+
+Data Security
+
+We implement appropriate security measures to protect your information from unauthorized access, alteration, or disclosure.
+
+Third-Party Services
+
+We may use third-party services (such as Stripe) to facilitate payments and platform functionality.
+
+Your Rights
+
+You may request:
+	•	Access to your personal data
+	•	Correction of inaccurate data
+	•	Deletion of your data (subject to legal requirements)
+
+For privacy inquiries, contact: [Your Email]
+
+⸻
+
+TERMS OF USE
+
+Effective Date: [Insert Date]
+
+By using ReserveEZ, you agree to the following terms:
+
+Platform Role
+
+ReserveEZ provides a reservation management platform. We do not own, operate, or manage participating restaurants.
+
+All dining services are provided solely by the restaurant.
+
+User Responsibilities
+
+Guests agree to:
+	•	Provide accurate information
+	•	Honor reservations
+	•	Comply with restaurant policies
+
+Restaurants agree to:
+	•	Provide accurate availability
+	•	Honor confirmed reservations
+	•	Maintain lawful business operations
+
+Deposits & Refunds
+
+Deposit policies are determined by each restaurant. Refund eligibility is governed by the restaurant’s cancellation policy.
+
+ReserveEZ is not responsible for disputes regarding dining experiences.
+
+Account Termination
+
+We reserve the right to suspend or terminate accounts for:
+	•	Fraud
+	•	Misuse
+	•	Violation of terms
+
+Limitation of Liability
+
+ReserveEZ is not liable for:
+	•	Restaurant service quality
+	•	Food quality
+	•	Guest conduct
+	•	Business losses due to operational decisions
+
+Use of the platform is at your own risk.
+
+⸻
+
+DATA POLICY
+
+ReserveEZ is committed to responsible data handling.
+
+Data Collection Principles
+
+We collect only data necessary to:
+	•	Facilitate reservations
+	•	Ensure secure payments
+	•	Improve platform performance
+
+Data Storage
+
+Data is stored securely using industry-standard security measures.
+
+Data Retention
+
+We retain data only as long as necessary to:
+	•	Fulfill service obligations
+	•	Comply with legal requirements
+	•	Resolve disputes
+
+Data Sharing
+
+We do not sell personal data.
+
+We may share data with:
+	•	Payment processors (Stripe)
+	•	Legal authorities if required by law
+
+Cookies & Tracking
+
+ReserveEZ may use cookies to:
+	•	Improve user experience
+	•	Track site performance
+	•	Maintain session security
+
+Users may disable cookies through browser settings, though this may impact functionality.
