@@ -31,6 +31,14 @@ BASE_URL = os.getenv("BASE_URL", os.getenv("VERCEL_URL", "http://localhost:5000"
 if BASE_URL and not BASE_URL.startswith(("http://", "https://")):
     BASE_URL = f"https://{BASE_URL}"
 
+_show_templates_default = "false" if os.getenv("VERCEL_ENV") == "production" else "true"
+SHOW_TEMPLATE_RESTAURANTS = os.getenv("SHOW_TEMPLATE_RESTAURANTS", _show_templates_default).lower() == "true"
+TEMPLATE_RESTAURANT_SLUGS = {
+    "the-golden-fork",
+    "sakura-garden",
+    "casa-bella",
+}
+
 CUISINE_TYPES = [
     "African", "American", "Italian", "Mexican", "Chinese", "Japanese", "Indian",
     "Jamaican", "Nigerian", "Thai", "French", "Mediterranean", "Korean", "Vietnamese", "Greek",

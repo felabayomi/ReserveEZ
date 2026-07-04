@@ -4,7 +4,14 @@ from flask import (Blueprint, render_template, request, redirect, url_for, abort
                    jsonify, flash, make_response)
 import stripe
 from models import db, Restaurant, Table, Reservation, WaitlistEntry, NoShowRecord, PromoCode, PaymentTransaction, RestaurantNomination
-from config import STRIPE_PUBLIC_KEY, STRIPE_WEBHOOK_SECRET, CUISINE_TYPES, BASE_URL
+from config import (
+    STRIPE_PUBLIC_KEY,
+    STRIPE_WEBHOOK_SECRET,
+    CUISINE_TYPES,
+    BASE_URL,
+    SHOW_TEMPLATE_RESTAURANTS,
+    TEMPLATE_RESTAURANT_SLUGS,
+)
 from helpers import (as_money, generate_time_slots, get_day_key, find_available_tables,
                      get_no_show_count, calculate_end_time, notify_waitlist_for_slot, make_slug)
 from email_service import (send_confirmation_email, send_reminder_email,
@@ -17,9 +24,15 @@ from email_service import (send_confirmation_email, send_reminder_email,
 public_bp = Blueprint("public", __name__)
 
 
+def _is_hidden_template(restaurant):
+    return (not SHOW_TEMPLATE_RESTAURANTS) and restaurant.slug in TEMPLATE_RESTAURANT_SLUGS
+
+
 @public_bp.route("/")
 def index():
     restaurants = Restaurant.query.filter_by(active=True).order_by(Restaurant.name).all()
+    if not SHOW_TEMPLATE_RESTAURANTS:
+        restaurants = [r for r in restaurants if r.slug not in TEMPLATE_RESTAURANT_SLUGS]
     cuisine_filter = request.args.get("cuisine", "")
     if cuisine_filter:
         restaurants = [r for r in restaurants if r.cuisine_type == cuisine_filter]
@@ -32,6 +45,8 @@ def index():
 @public_bp.route("/restaurant/<slug>")
 def restaurant_detail(slug):
     restaurant = Restaurant.query.filter_by(slug=slug, active=True).first_or_404()
+    if _is_hidden_template(restaurant):
+        abort(404)
     today = dt.date.today()
     selected_date = request.args.get("date", today.isoformat())
     try:
@@ -81,6 +96,8 @@ def restaurant_detail(slug):
 @public_bp.route("/reserve/<slug>", methods=["GET", "POST"])
 def reserve(slug):
     restaurant = Restaurant.query.filter_by(slug=slug, active=True).first_or_404()
+    if _is_hidden_template(restaurant):
+        abort(404)
 
     if request.method == "GET":
         date_str = request.args.get("date")
@@ -712,6 +729,8 @@ def api_availability():
 
     restaurant = Restaurant.query.get(restaurant_id)
     if not restaurant:
+        return jsonify({"error": "Restaurant not found"}), 404
+    if _is_hidden_template(restaurant):
         return jsonify({"error": "Restaurant not found"}), 404
 
     try:
