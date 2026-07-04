@@ -1,5 +1,6 @@
 import datetime as dt
 import json
+import tempfile
 from flask import Flask
 from config import SECRET_KEY, DATABASE_URI, CUISINE_TYPES
 from models import db, init_serializer, Restaurant, Table, PromoCode
@@ -7,7 +8,7 @@ from helpers import as_money
 
 
 def create_app():
-    app = Flask(__name__, instance_path="/tmp")
+    app = Flask(__name__, instance_path=tempfile.gettempdir())
     app.config["SECRET_KEY"] = SECRET_KEY
     app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URI
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
