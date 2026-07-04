@@ -6,7 +6,7 @@ import resend
 load_dotenv()
 
 SECRET_KEY = os.getenv("FLASK_SECRET", "restaurant-reserve-secret-key")
-DATABASE_URI = os.getenv("DATABASE_URL", "sqlite:///reservations.db")
+DATABASE_URI = os.getenv("DATABASE_URL", "sqlite:////tmp/reservations.db")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin")
 SENDER_NAME = os.getenv("SENDER_NAME", "ReserveEZ")
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@reserveez.com")

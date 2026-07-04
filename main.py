@@ -7,7 +7,7 @@ from helpers import as_money
 
 
 def create_app():
-    app = Flask(__name__)
+    app = Flask(__name__, instance_path="/tmp")
     app.config["SECRET_KEY"] = SECRET_KEY
     app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URI
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
