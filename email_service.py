@@ -214,6 +214,26 @@ def send_admin_new_registration(restaurant_user):
         db.session.commit()
 
 
+def send_admin_nomination(nomination):
+    if not ADMIN_EMAIL:
+        print("[NOMINATION EMAIL SKIP] ADMIN_EMAIL is not configured.")
+        return False
+
+    admin_url = f"{BASE_URL}/admin/nominations"
+    html = render_template("emails/admin_nomination.html",
+                           nomination=nomination,
+                           admin_url=admin_url)
+    success = send_email(ADMIN_EMAIL,
+                         f"New Restaurant Nomination - {nomination.restaurant_name}",
+                         html)
+    if success:
+        log = NotificationLog(notification_type="admin_nomination",
+                              recipient_email=ADMIN_EMAIL)
+        db.session.add(log)
+        db.session.commit()
+    return success
+
+
 def send_admin_deposit_failed(reservation, error_message):
     if not ADMIN_EMAIL:
         return

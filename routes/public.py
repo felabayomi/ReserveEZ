@@ -19,6 +19,7 @@ from email_service import (send_confirmation_email, send_reminder_email,
                            send_restaurant_new_reservation, send_deposit_receipt,
                            send_restaurant_cancellation, send_deposit_refund_email,
                            send_restaurant_no_show, send_admin_deposit_failed,
+                           send_admin_nomination,
                            send_restaurant_deposit_received)
 
 public_bp = Blueprint("public", __name__)
@@ -714,6 +715,10 @@ def nominate():
         )
         db.session.add(nom)
         db.session.commit()
+        try:
+            send_admin_nomination(nom)
+        except Exception as e:
+            print(f"Nomination email error: {e}")
         flash("Thank you! Your nomination has been submitted. We'll reach out to them.", "success")
         return redirect(url_for("public.nominate"))
     nomination_count = RestaurantNomination.query.count()
