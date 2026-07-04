@@ -1,5 +1,6 @@
 import datetime as dt
 import json
+from urllib.parse import quote
 from flask import (Blueprint, render_template, request, redirect, url_for, abort,
                    jsonify, flash, make_response)
 import stripe
@@ -11,6 +12,8 @@ from config import (
     BASE_URL,
     SHOW_TEMPLATE_RESTAURANTS,
     TEMPLATE_RESTAURANT_SLUGS,
+    NOMINATION_MAILTO_FALLBACK,
+    NOMINATION_FALLBACK_EMAIL,
 )
 from helpers import (as_money, generate_time_slots, get_day_key, find_available_tables,
                      get_no_show_count, calculate_end_time, notify_waitlist_for_slot, make_slug)
@@ -715,6 +718,27 @@ def nominate():
         )
         db.session.add(nom)
         db.session.commit()
+
+        if NOMINATION_MAILTO_FALLBACK and NOMINATION_FALLBACK_EMAIL:
+            subject = f"New Restaurant Nomination - {nom.restaurant_name}"
+            body_lines = [
+                "A new restaurant nomination was submitted:",
+                "",
+                f"Restaurant Name: {nom.restaurant_name}",
+                f"City: {nom.city}",
+                f"Restaurant Email: {nom.restaurant_email or 'Not provided'}",
+                f"Nominator Name: {nom.nominator_name or 'Not provided'}",
+                f"Nominator Email: {nom.nominator_email or 'Not provided'}",
+                "",
+                f"Submitted At (UTC): {nom.created_at}",
+            ]
+            mailto_url = (
+                f"mailto:{quote(NOMINATION_FALLBACK_EMAIL)}"
+                f"?subject={quote(subject)}"
+                f"&body={quote(chr(10).join(body_lines))}"
+            )
+            return redirect(mailto_url)
+
         try:
             send_admin_nomination(nom)
         except Exception as e:

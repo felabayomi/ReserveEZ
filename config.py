@@ -12,6 +12,8 @@ SENDER_NAME = os.getenv("SENDER_NAME", "ReserveEZ")
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "")
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
 SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY", "")
+NOMINATION_MAILTO_FALLBACK = os.getenv("NOMINATION_MAILTO_FALLBACK", "true").lower() == "true"
+NOMINATION_FALLBACK_EMAIL = os.getenv("NOMINATION_FALLBACK_EMAIL", "felixdgreat@icloud.com")
 
 
 def init_stripe():
