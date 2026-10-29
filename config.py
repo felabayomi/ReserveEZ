@@ -45,7 +45,7 @@ CUISINE_TYPES = [
     "African", "American", "Italian", "Mexican", "Chinese", "Japanese", "Indian",
     "Jamaican", "Nigerian", "Thai", "French", "Mediterranean", "Korean", "Vietnamese", "Greek",
     "Spanish", "Middle Eastern", "Caribbean", "Brazilian", "Ethiopian",
-    "Seafood", "Steakhouse", "Vegetarian/Vegan", "Fusion", "Other"
+    "Seafood", "Soul food", "Steakhouse", "Vegetarian/Vegan", "Fusion", "Other"
 ]
 
 TIME_SLOTS_INTERVAL = 30
